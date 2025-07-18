@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ocrsmith"
+version = "0.1.0"
+description = "A versatile OCR dataset generator for Arabic and Latin text, with synthetic text generation and dataset export."
+readme = "README.md"
+authors = [
+    { name = "Haitam Bouanane", email = "bouananehaitam03@gmail.com" }
+]
+license = { file = "LICENSE" }
+keywords = ["OCR", "synthetic data", "Arabic OCR", "dataset generator"]
+requires-python = ">=3.11"
+dependencies = [
+    "pillow",
+    "pandas",
+    "datasets",
+    "huggingface_hub",
+    "pyyaml",
+    "tqdm"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8"
+]
+
+[project.scripts]
+ocrsmith = "ocrsmith.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
