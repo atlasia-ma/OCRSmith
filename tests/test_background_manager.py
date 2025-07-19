@@ -1,15 +1,14 @@
 import pytest
 from ocrsmith.core.background_manager import BackgroundManager
 from ocrsmith.core.backgrounds.BackgroundFactory import BackgroundFactory
-from ocrsmith.core.backgrounds.creators.builders import ColorBackgroundBuilder, ImageBackgroundBuilder
 from ocrsmith.core.backgrounds.creators.ColorBackground import ColorBackground
 from ocrsmith.core.backgrounds.creators.ImageBackground import ImageBackground
 
 @pytest.fixture
 def factory():
     f = BackgroundFactory()
-    f.register_builder('solid', ColorBackgroundBuilder())
-    f.register_builder('image', ImageBackgroundBuilder())
+    f.register_creator('solid', ColorBackground)
+    f.register_creator('image', ImageBackground)
     return f
 
 def test_manager_creates_backgrounds(factory):

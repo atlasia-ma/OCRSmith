@@ -3,7 +3,7 @@
 from .BaseBackground import BaseBackground
 
 class ColorBackground(BaseBackground):
-    def __init__(self, color):
+    def __init__(self, color, **_ignored):
         super().__init__()
         self.color = color
 

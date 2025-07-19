@@ -2,7 +2,7 @@
 from .BaseBackground import BaseBackground
 
 class ImageBackground(BaseBackground):
-    def __init__(self, image_path):
+    def __init__(self, image_path, **_ignored):
         super().__init__()
         self.image_path = image_path
 

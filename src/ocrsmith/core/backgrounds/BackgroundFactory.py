@@ -2,19 +2,18 @@
 
 class BackgroundFactory:
     def __init__(self):
-        self._builders = {}
+        self._creators = {}
 
-    def register_builder(self, key, builder):
-        self._builders[key] = builder
+    def register_creator(self, key, creator):
+        self._creators[key] = creator
 
     def create(self, key, **kwargs):
-        builder = self._builders.get(key)
-        if not builder:
-            available_keys = ", ".join(self._builders.keys())
+        creator = self._creators.get(key)
+        if not creator:
+            available_keys = ", ".join(self._creators.keys())
             raise ValueError(
-                f"Unknown builder key '{key}'. "
-                f"Available builders are: [{available_keys}]"
+                f"Unknown creator key '{key}'. "
+                f"Available creators are: [{available_keys}]"
             )
-        print(kwargs)
-        return builder(**kwargs)
+        return creator(**kwargs)
     
