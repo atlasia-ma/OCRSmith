@@ -1,0 +1,18 @@
+fonts:
+  - path: assets/fonts/arial.ttf
+    size: 32
+backgrounds:
+  - type: solid
+    color: "#FFFFFF"
+  - type: image
+    image_path: "assets/backgrounds/default_background.jpg"
+  - type: image
+    image_path: "assets/backgrounds/default_background_2.jpg"
+layout:
+  type: simple
+output:
+  images_dir: outputs/images
+  metadata_file: outputs/metadata.jsonl
+dataset:
+  source: csv
+  path: data/input.csv

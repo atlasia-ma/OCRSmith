@@ -14,19 +14,13 @@ license = { file = "LICENSE" }
 keywords = ["OCR", "synthetic data", "Arabic OCR", "dataset generator"]
 requires-python = ">=3.11"
 dependencies = [
-    "pillow",
-    "pandas",
-    "datasets",
-    "huggingface_hub",
-    "pyyaml",
-    "tqdm"
+    "pydantic>=2.11.7",
+    "PyYAML==6.0.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "black",
-    "flake8"
+    "pytest==8.4.1",
 ]
 
 [project.scripts]

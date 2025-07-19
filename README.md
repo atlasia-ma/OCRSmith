@@ -24,3 +24,13 @@ It enables users to create datasets from raw text, CSV files, Hugging Face datas
 ```bash
 pip install ocrsmith
 ```
+
+## To clone the repo
+
+git clone repo-id
+
+cp .env .env.exemple
+
+fill with your varaibles
+
+conda create -n ocrsmith python=3.11
