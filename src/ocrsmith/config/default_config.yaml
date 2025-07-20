@@ -5,14 +5,19 @@ backgrounds:
   - type: solid
     color: "#FFFFFF"
   - type: image
-    image_path: "assets/backgrounds/default_background.png"
+    image_path: "assets/backgrounds/test_default_background.png"
+    mode: "stretch"
   - type: image
-    image_path: "assets/backgrounds/default_background_2.png"
+    image_path: "assets/backgrounds/test_default_background_2.png"
+    mode: "stretch"
   - type: gradient
     start_color: [255, 0, 0]
     end_color: [0, 0, 255]
     direction: "horizontal"
   - type: noise
+    base_color: [128, 128, 128]
+    noise_type: "random"
+    intensity: 0.5
 
 layout:
   type: simple
