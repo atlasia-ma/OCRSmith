@@ -1,6 +1,6 @@
 # src/ocrsmith/config/schema.py
 from pydantic import BaseModel, Field, ValidationError
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 import yaml
 
 class FontConfig(BaseModel):
@@ -9,8 +9,20 @@ class FontConfig(BaseModel):
 
 class BackgroundConfig(BaseModel):
     type: str
-    color: Optional[str] = None
+    
+    color: Optional[Union[str, Tuple[int, int, int]]] = None
+    
     image_path: Optional[str] = None
+    mode: Optional[str] = None
+    
+    start_color: Optional[Tuple[int, int, int]] = None
+    end_color: Optional[Tuple[int, int, int]] = None
+    direction: Optional[str] = None
+    
+    noise_type: Optional[str] = None
+    intensity: Optional[float] = None
+    base_color: Optional[Tuple[int, int, int]] = None
+    
 
 class LayoutConfig(BaseModel):
     type: str

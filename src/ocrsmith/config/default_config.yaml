@@ -5,9 +5,15 @@ backgrounds:
   - type: solid
     color: "#FFFFFF"
   - type: image
-    image_path: "assets/backgrounds/default_background.jpg"
+    image_path: "assets/backgrounds/default_background.png"
   - type: image
-    image_path: "assets/backgrounds/default_background_2.jpg"
+    image_path: "assets/backgrounds/default_background_2.png"
+  - type: gradient
+    start_color: [255, 0, 0]
+    end_color: [0, 0, 255]
+    direction: "horizontal"
+  - type: noise
+
 layout:
   type: simple
 output:
