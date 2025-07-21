@@ -7,7 +7,7 @@ import random
 class BackgroundManager:
     def __init__(self, config: AppConfig, factory: BackgroundFactory):
         self.backgrounds = [
-            factory.create(background.type, **vars(background))
+            factory.create(background.type, **background.model_dump(exclude_none=True))
             for background in config.backgrounds
         ]
         if not self.backgrounds:

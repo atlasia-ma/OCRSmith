@@ -45,3 +45,6 @@ class ImageBackground(BaseBackground):
             y = (height - self.base_image.height) // 2
             result.paste(self.base_image, (x, y))
             return result
+        
+        else:
+            raise ValueError(f"Unknown render mode '{self.mode}' for ImageBackground")

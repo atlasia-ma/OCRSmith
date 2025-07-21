@@ -1,5 +1,5 @@
 import pytest
-from ocrsmith.core.background_manager import BackgroundManager
+from ocrsmith.core.BackgroundManager import BackgroundManager
 from ocrsmith.core.backgrounds.BackgroundFactory import BackgroundFactory
 from ocrsmith.core.backgrounds.creators.SolidColorBackground import SolidColorBackground
 from ocrsmith.core.backgrounds.creators.ImageBackground import ImageBackground

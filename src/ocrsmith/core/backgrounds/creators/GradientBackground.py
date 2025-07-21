@@ -6,7 +6,7 @@ from typing import Tuple
 
 class GradientBackground(BaseBackground):
     
-    def __init__(self, start_color: Tuple[int, int, int], end_color: Tuple[int, int, int], 
+    def __init__(self, start_color: Tuple[int, int, int] = (255, 255, 255), end_color: Tuple[int, int, int] = (200, 200, 200), 
                  direction: str = 'horizontal', **_ignored):
         self.start_color = start_color
         self.end_color = end_color

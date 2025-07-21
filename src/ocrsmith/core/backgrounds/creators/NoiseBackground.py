@@ -8,7 +8,6 @@ import numpy as np
 class NoiseBackground(BaseBackground):
     def __init__(self, noise_type: str = 'random', intensity: float = 0.5, 
                  base_color: Tuple[int, int, int] = (128, 128, 128), **_ignored):
-        
         self.noise_type = noise_type
         self.intensity = intensity
         self.base_color = base_color
@@ -16,18 +15,17 @@ class NoiseBackground(BaseBackground):
     def render(self, width: int, height: int) -> Image.Image:
         if self.noise_type == 'random':
             noise = np.random.random((height, width, 3))
+            return self._apply_color(noise)
+
+        elif self.noise_type == 'gaussian':
+            noise = np.random.normal(loc=235, scale=10, size=(height, width)).clip(0, 255)
+            return Image.fromarray(noise.astype(np.uint8), mode='L').convert("RGBA")
+
         else:
-            x, y = np.meshgrid(np.linspace(0, 10, width), np.linspace(0, 10, height))
-            noise = np.stack([
-                np.sin(x) * np.cos(y),
-                np.sin(x + 2) * np.cos(y + 2),
-                np.sin(x + 4) * np.cos(y + 4)
-            ], axis=2)
-            noise = (noise + 1) / 2  
-        
-        # Apply noise to base color
+            raise ValueError(f"Unknown noise type '{self.noise_type}' for NoiseBackground")
+
+    def _apply_color(self, noise: np.ndarray) -> Image.Image:
         base = np.array(self.base_color) / 255.0
         result = base + (noise - 0.5) * self.intensity
         result = np.clip(result, 0, 1) * 255
-        
         return Image.fromarray(result.astype(np.uint8))
