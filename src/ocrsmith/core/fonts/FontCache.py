@@ -40,3 +40,4 @@ class FontCache:
                 'size': len(self._cache),
                 'keys': list(self._cache.keys())
             }
+            

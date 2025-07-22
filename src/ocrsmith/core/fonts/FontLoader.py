@@ -36,7 +36,7 @@ class FontLoader:
     @staticmethod
     def create_default_font(size: int = 32) -> FreeTypeFont:
         try:
-            return ImageFont.load_default()
+            return ImageFont.load_default(size)
         except Exception:
             try:
                 return ImageFont.load()

@@ -3,9 +3,7 @@ fonts:
     size: 32
 backgrounds:
   - type: noise
-    noise_type: gaussian
-  - type: noise
-    noise_type: else  
+    noise_type: gaussian  
 
 layout:
   type: simple

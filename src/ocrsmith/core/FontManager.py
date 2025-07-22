@@ -13,12 +13,19 @@ class FontManager:
         self.logger = logging.getLogger(__name__)
         self.font_paths = self._validate_font_paths(font_paths or [])
         self.default_size = default_size
+        
+    def __len__(self) -> int:
+        return len(self.font_paths)
+    
+    def __repr__(self) -> str:
+        cache_size = FontCache().size()
+        return f"FontManager(fonts={len(self.font_paths)}, cached_fonts={cache_size})"
     
     def _validate_font_paths(self, font_paths: List[Union[str, Path]]) -> List[Path]:
         validated_paths = []
         
         for path in font_paths:
-            path_obj = Path(path).expanduser().resolve()
+            path_obj = Path(path).resolve()
             if path_obj.exists():
                 if path_obj.is_file() and self._is_font_file(path_obj):
                     validated_paths.append(path_obj)
@@ -59,45 +66,22 @@ class FontManager:
         if font_size is None:
             font_size = self.default_size
         
-        if font_path is None:
+        if font_path is None or len(font_path)==0:
             font_path = self.get_random_font_path()
-        else:
-            font_path = Path(font_path).expanduser().resolve()
-            if not font_path.exists():
-                self.logger.warning(f"Specified font path does not exist: {font_path}")
-                font_path = self.get_random_font_path()
         
-        return FontLoader.create_font(font_path, font_size, use_cache)
+        try:
+            font = FontLoader.create_font(font_path, font_size, use_cache)
+        except Exception as e:
+            font_path = self. get_random_font_path()
+            font = FontLoader.create_font(font_path, font_size, use_cache)
+        
+        return font
     
     def get_default_font(self, font_size: Optional[int] = None) -> FreeTypeFont:
         if font_size is None:
             font_size = self.default_size
         
         return FontLoader.create_default_font(font_size)
-    
-    @staticmethod
-    def get_text_dimensions(font: FreeTypeFont, text: str) -> Tuple[int, int]:
-        if not text:
-            return (0, 0)
-        
-        bbox = font.getbbox(text)
-        width = bbox[2] - bbox[0]
-        height = bbox[3] - bbox[1]
-        return (width, height)
-    
-    @staticmethod
-    def get_text_width(font: FreeTypeFont, text: str) -> int:
-        bbox = font.getbbox(text)
-        return bbox[2] - bbox[0]
-    
-    @staticmethod
-    def get_text_height(font: FreeTypeFont, text: str) -> int:
-        if not text:
-            bbox = font.getbbox("Ag")
-            return bbox[3] - bbox[1]
-        
-        bbox = font.getbbox(text)
-        return bbox[3] - bbox[1]
     
     def clear_cache(self) -> None:
         """Clear the singleton font cache."""
@@ -109,13 +93,34 @@ class FontManager:
     
     def get_available_fonts(self) -> List[Path]:
         """Get list of all available font paths."""
-        return self.font_paths.copy()
+        return self.font_paths.copy()   
     
-    def __len__(self) -> int:
-        """Return number of available fonts."""
-        return len(self.font_paths)
+    def remove_fonts(self, paths: Optional[List[str]] = None):
+        if paths is None:
+            self.font_paths.clear()
+            self.clear_cache()
+        else:
+            paths_to_remove = [Path(p).resolve() for p in paths]
+            self.font_paths = [p for p in self.font_paths if p not in paths_to_remove]
     
-    def __repr__(self) -> str:
-        cache_size = FontCache().size()
-        return f"FontManager(fonts={len(self.font_paths)}, cached_fonts={cache_size})"
+    @staticmethod
+    def get_text_width(font: FreeTypeFont, text: str) -> int:
+        return round(font.getlength(text))
+    
+    @staticmethod
+    def get_text_height(font: FreeTypeFont, text: str) -> int:
+        if not text:
+            bbox = font.getbbox("Ag")
+            return bbox[3] - bbox[1]
+        
+        bbox = font.getbbox(text)
+        return bbox[3] - bbox[1]
+    
+    @staticmethod
+    def get_text_dimensions(font: FreeTypeFont, text: str) -> Tuple[int, int]:
+        return (FontManager.get_text_width(font, text), FontManager.get_text_height(font, text))
+    
+
+    
+    
     
