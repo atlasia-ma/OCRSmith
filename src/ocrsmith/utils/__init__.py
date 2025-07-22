@@ -1,0 +1,1 @@
+from .generate_random_color import generate_random_color

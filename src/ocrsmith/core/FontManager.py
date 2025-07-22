@@ -87,9 +87,6 @@ class FontManager:
     
     @staticmethod
     def get_text_width(font: FreeTypeFont, text: str) -> int:
-        if not text:
-            return 0
-        
         bbox = font.getbbox(text)
         return bbox[2] - bbox[0]
     

@@ -1,5 +1,5 @@
 from ocrsmith.core.FontManager import FontManager
-font_manager = FontManager(font_paths=["fonts"],default_size=24)
+font_manager = FontManager(font_paths=["assets/fonts"],default_size=24)
 
 # Factory pattern - FontLoader creates fonts with caching
 font1 = font_manager.load_font(font_size=18)

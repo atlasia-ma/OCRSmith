@@ -2,7 +2,8 @@
 
 from abc import ABC, abstractmethod
 
-class BaseTextRenderer:
+class TextRendererInterface:
     @abstractmethod
     def generate_text_image():
         pass
+    
