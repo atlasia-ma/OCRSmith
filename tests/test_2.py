@@ -28,7 +28,7 @@ font_manager = FontManager(font_paths=["assets/fonts"],default_size=24)
 font = font_manager.load_font(font_size=18)
 print(f"Loaded font: {font}")
 
-text = "يل لاختبار توليد الصورة بالنص العربي."
+text = "يل لاختبار توليد الصورة بالنص العربي"
 
 text_renderer = TextRenderer(HorizontalRenderingStrategy())
 image, mask, (width, height) = text_renderer.generate_text_image(font, text)

@@ -204,3 +204,6 @@ __marimo__/
 
 assets/backgrounds/test_*.*
 test.py
+
+training_data
+assets/text_data
