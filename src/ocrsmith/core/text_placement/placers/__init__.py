@@ -1,0 +1,2 @@
+from .CenterPlacementStrategy import CenterPlacementStrategy
+from .RandomPlacementStrategy import RandomPlacementStrategy
