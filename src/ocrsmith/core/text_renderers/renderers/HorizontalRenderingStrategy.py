@@ -14,6 +14,9 @@ class HorizontalRenderingStrategy(BaseTextRenderingStrategy):
         horizontal_extra_padding = font.size * 3 # To make it as clean as possible, somtimes with italic we don't get the correct hight, it will be removed at the end
         vertical_extra_padding = font.size
         
+        if render_one_line:
+            text = (" ").join(text.split('\n'))
+        
         lines = text.split('\n')
         text_height = FontManager.get_text_height(font, text) * len(lines) + spacing * (len(lines) - 1)
         
