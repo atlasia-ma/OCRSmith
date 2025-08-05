@@ -1,4 +1,4 @@
 from .GradientBackground import GradientBackground
 from .ImageBackground import ImageBackground
-from .NoiseBackground import NoiseBackground
+from .TextureBackground import TextureBackground
 from .SolidColorBackground import SolidColorBackground
