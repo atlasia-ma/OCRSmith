@@ -1,11 +1,20 @@
 # src/ocrsmith/core/backgrounds/creators/ImageBackground.py
+
 from .BaseBackground import BaseBackground
 from PIL import Image
+from pathlib import Path
 
 class ImageBackground(BaseBackground):
     def __init__(self, image_path: str, mode: str = 'stretch', **_ignored):
-        self.image_path = image_path
         self.mode = mode
+        image_path = Path(image_path)
+        if not image_path.is_absolute():
+            project_root = Path(__file__).resolve().parents[5]
+            image_path = project_root / image_path
+            
+
+        self.base_image = Image.open(image_path)
+
         self.base_image = Image.open(image_path)
     
     def render(self, width: int, height: int) -> Image.Image:

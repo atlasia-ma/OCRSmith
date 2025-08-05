@@ -11,7 +11,6 @@ def main():
     # Initialize engine
     engine = OCRSmithEngine(configs)
     
-    # Setup components (your existing code)
     factory = BackgroundFactory()
     factory.register_creator('solid', SolidColorBackground)
     factory.register_creator('image', ImageBackground)
@@ -21,7 +20,6 @@ def main():
     engine.background_manager = BackgroundManager(configs, factory)
     engine.font_manager = FontManager(font_paths=["assets/fonts"], default_size=24)
     
-    # Load text data
     engine.text_data_manager.load_from_source(
         'csv', 
         'assets/text_data/sentences.csv', 

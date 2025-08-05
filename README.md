@@ -7,6 +7,7 @@
 ## 🚀 Features
 
 ### Core Functionality
+
 - **Synthetic text image generation** with configurable fonts and backgrounds
 - **Multi-language support**: Arabic and Latin text rendering with proper font handling
 - **Flexible text placement strategies**: random, centered, grid-based, and contextual positioning
@@ -14,6 +15,7 @@
 - **Comprehensive background generation**: solid colors, gradients, noise patterns, and custom images
 
 ### Text Placement & Layout
+
 - **Contextual placement strategies**:
   - **Page titles**: Top-centered positioning with proper margins
   - **Page numbers**: Bottom-right corner placement
@@ -24,6 +26,7 @@
 - **Rich metadata**: Detailed placement information for training optimization
 
 ### Data Sources
+
 - **Multiple input formats**:
   - CSV files with configurable text columns
   - Hugging Face datasets with automatic loading
@@ -33,6 +36,7 @@
 - **Memory-optimized**: Iterator-based text loading for large datasets
 
 ### Augmentation System
+
 - **Pipeline-based augmentation**: Chain multiple effects with probability control
 - **Built-in augmentations**:
   - Gaussian noise injection
@@ -87,8 +91,8 @@ OCRSmith/
 git clone https://github.com/yourusername/OCRSmith.git
 cd OCRSmith
 
-# Install dependencies
-pip install -r requirements.txt
+# Install in production mode
+pip install .
 
 # Install in development mode
 pip install -e .
@@ -224,6 +228,7 @@ augmentation:
 OCRSmith includes extensive font support:
 
 ### Arabic Fonts
+
 - **Amiri**: Traditional Arabic typography (Regular, Bold, Italic, BoldItalic)
 - **Fustat**: Modern Arabic font family (7 weights)
 - **IBM Plex Sans Arabic**: Professional Arabic fonts (7 weights)
@@ -236,6 +241,7 @@ OCRSmith includes extensive font support:
 - **Vazirmatn**: High-quality Persian/Arabic font (9 weights)
 
 ### Latin Fonts
+
 - **IBM Plex Sans**: Modern, professional Latin fonts
 - **Noto Sans Mono**: Monospace fonts for technical text
 
@@ -283,15 +289,15 @@ class CustomPlacementStrategy(TextPlacementStrategy):
     def place_text(self, text_image, background_image, **kwargs):
         # Custom placement logic
         x, y = self.calculate_position(text_image, background_image)
-        
+      
         # Compose image
         composed_image = background_image.copy()
         composed_image.paste(text_image, (x, y), text_image)
-        
+      
         # Return result with metadata
         bbox = (x, y, x + text_image.size[0], y + text_image.size[1])
         metadata = {'placement_type': 'custom', 'position': (x, y)}
-        
+      
         return PlacementResult(composed_image, bbox, metadata)
 
 # Register custom strategy

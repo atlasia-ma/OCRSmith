@@ -1,3 +1,3 @@
-from .placers import CenterPlacementStrategy, RandomPlacementStrategy
+from .placers import CenterPlacementStrategy, RandomPlacementStrategy, GridPlacementStrategy, PageNumberPlacementStrategy, PageTitlePlacementStrategy
 from .PlacementResult import PlacementResult
 from .TextPlacementStrategy import TextPlacementStrategy

@@ -6,7 +6,8 @@ from PIL import Image
 from ocrsmith.core.augmentation import (
     NoiseAugmentation,
     BlurAugmentation,
-    RotationAugmentation
+    RotationAugmentation,
+    BrightnessAugmentation
 )
 
 from ocrsmith.core.AugmentationPipeline import AugmentationPipeline
@@ -40,6 +41,22 @@ class TestBlurAugmentation:
             
             assert result == sample_text_image
             mock_filter.assert_called_once()
+            
+class TestBrightnessAugmentation:
+    """Test BrightnessAugmentation"""
+    
+    @patch('PIL.ImageEnhance.Brightness')
+    def test_brightness_augmentation(self, mock_brightness_class, sample_text_image):
+        mock_enhancer = Mock()
+        mock_enhancer.enhance.return_value = sample_text_image
+        mock_brightness_class.return_value = mock_enhancer
+        
+        augmentation = BrightnessAugmentation(brightness_factor=1.5)
+        result = augmentation.apply(sample_text_image)
+        
+        assert result == sample_text_image
+        mock_brightness_class.assert_called_once_with(sample_text_image)
+        mock_enhancer.enhance.assert_called_once_with(1.5)
 
 class TestRotationAugmentation:
     """Test RotationAugmentation"""

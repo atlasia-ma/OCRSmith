@@ -11,7 +11,7 @@ class HorizontalRenderingStrategy(BaseTextRenderingStrategy):
     def render_text(self, font: FreeTypeFont, text: str, spacing: int = 0,
                    text_color: str ="#000000", stroke_width: int= 0, stroke_fill: str = "#282828", render_one_line = False, align = "right") -> tuple:
         
-        horizontal_extra_padding = font.size * 3 # To make it as clean as possible, somtimes with italic we don't get the correct hight, it will be removed at the end
+        horizontal_extra_padding = font.size * 3 # To make it as clean as possible, sometimes with italic we don't get the correct hight, It will be removed at the end
         vertical_extra_padding = font.size
         
         if render_one_line:

@@ -5,11 +5,9 @@ from .PlacementManager import PlacementManager
 from .TextRenderer import TextRenderer
 from ..datasets import TextDataManager
 
-from .text_placement import CenterPlacementStrategy, RandomPlacementStrategy
+from .text_placement import CenterPlacementStrategy, RandomPlacementStrategy, GridPlacementStrategy, PageNumberPlacementStrategy, PageTitlePlacementStrategy
 from .augmentation import BlurAugmentation, NoiseAugmentation
 from .text_renderers import HorizontalRenderingStrategy
-
-
 
 class OCRSmithEngine:
     """Main engine that orchestrates all components"""
@@ -30,6 +28,9 @@ class OCRSmithEngine:
         """Setup default placement strategies"""
         self.placement_manager.register_strategy('random', RandomPlacementStrategy())
         self.placement_manager.register_strategy('center', CenterPlacementStrategy())
+        self.placement_manager.register_strategy('grid', GridPlacementStrategy())
+        self.placement_manager.register_strategy('title', PageTitlePlacementStrategy())
+        self.placement_manager.register_strategy('page_number', PageNumberPlacementStrategy())
     
     def setup_augmentations(self, augmentation_config):
         """Setup augmentation pipeline from config"""

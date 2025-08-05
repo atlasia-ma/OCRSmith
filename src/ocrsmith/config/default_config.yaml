@@ -4,6 +4,8 @@ fonts:
 backgrounds:
   - type: noise
     noise_type: gaussian  
+  - type: image
+    image_path: 'assets/backgrounds/test_default_background_2.png'  
 
 layout:
   type: simple

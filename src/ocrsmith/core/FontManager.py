@@ -120,7 +120,3 @@ class FontManager:
     def get_text_dimensions(font: FreeTypeFont, text: str) -> Tuple[int, int]:
         return (FontManager.get_text_width(font, text), FontManager.get_text_height(font, text))
     
-
-    
-    
-    

@@ -1,4 +1,4 @@
-# src/ocrsmith/core/text_placement/BaseAugmentation
+# src/ocrsmith/core/augmentation/augmenters/BaseAugmentation.py
 
 from abc import abstractmethod
 

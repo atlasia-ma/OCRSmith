@@ -1,4 +1,4 @@
-# src/ocrsmith/core/text_placement/placers/CenterPlacementStrategy.py
+# src/ocrsmith/core/augmentation/augmenters/BlurAugmentation.py
 
 from ..AugmentationStrategy import AugmentationStrategy
 

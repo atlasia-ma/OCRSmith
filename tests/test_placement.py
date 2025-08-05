@@ -6,6 +6,9 @@ from ocrsmith.core.text_placement import (
     PlacementResult,
     RandomPlacementStrategy,
     CenterPlacementStrategy,
+    GridPlacementStrategy,
+    PageTitlePlacementStrategy,
+    PageNumberPlacementStrategy,
 )
 from ocrsmith.core import PlacementManager
 
@@ -69,6 +72,54 @@ class TestCenterPlacementStrategy:
         assert result.bbox == (50, 25, 150, 75)
         assert result.metadata['placement_type'] == 'center'
         assert result.metadata['position'] == (50, 25)
+        
+class TestGridPlacementStrategy:
+    """Test GridPlacementStrategy"""
+    
+    def test_grid_placement(self, sample_text_image, sample_background_image):
+        strategy = GridPlacementStrategy(rows=2, cols=2)
+        
+        # First placement (0,0)
+        result1 = strategy.place_text(sample_text_image, sample_background_image)
+        assert result1.metadata['grid_cell'] == (0, 0)
+        assert result1.metadata['cell_position'] == 0
+        
+        # Second placement (0,1)
+        result2 = strategy.place_text(sample_text_image, sample_background_image)
+        assert result2.metadata['grid_cell'] == (0, 1)
+        assert result2.metadata['cell_position'] == 1
+
+class TestPageTitlePlacementStrategy:
+    """Test PageTitlePlacementStrategy"""
+    
+    def test_page_title_placement(self, sample_text_image, sample_background_image):
+        strategy = PageTitlePlacementStrategy(top_margin=30, side_margin=10)
+        
+        result = strategy.place_text(sample_text_image, sample_background_image)
+        
+        # Should be centered horizontally, with top margin
+        expected_x = (200 - 100) // 2  # 50
+        expected_y = 30
+        
+        assert result.bbox == (expected_x, expected_y, expected_x + 100, expected_y + 50)
+        assert result.metadata['placement_type'] == 'page_title'
+        assert result.metadata['content_type'] == 'title'
+
+class TestPageNumberPlacementStrategy:
+    """Test PageNumberPlacementStrategy"""
+    
+    def test_page_number_placement(self, sample_text_image, sample_background_image):
+        strategy = PageNumberPlacementStrategy(bottom_margin=20, right_margin=15)
+        
+        result = strategy.place_text(sample_text_image, sample_background_image)
+        
+        # Should be bottom-right
+        expected_x = 200 - 100 - 15  # 85
+        expected_y = 100 - 50 - 20   # 30
+        
+        assert result.bbox == (expected_x, expected_y, expected_x + 100, expected_y + 50)
+        assert result.metadata['placement_type'] == 'page_number'
+        assert result.metadata['content_type'] == 'page_number'
 
 class TestPlacementManager:
     """Test PlacementManager"""

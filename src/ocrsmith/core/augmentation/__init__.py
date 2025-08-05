@@ -1,2 +1,2 @@
 from .AugmentationStrategy import AugmentationStrategy
-from .augmenters import NoiseAugmentation, BlurAugmentation, RotationAugmentation
+from .augmenters import NoiseAugmentation, BlurAugmentation, RotationAugmentation, BrightnessAugmentation
