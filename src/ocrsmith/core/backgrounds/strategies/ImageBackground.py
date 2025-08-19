@@ -66,11 +66,11 @@ class ImageBackground(BaseBackground):
     
     def _load_image(self, image_path: str) -> Image.Image:
         """Load image with caching and path resolution."""
-
         path = Path(image_path)
         if not path.is_absolute():
-            project_root = Path(__file__).resolve().parents[5]
-            path = project_root / path
+            # Resolve relative to current working directory for predictability
+            cwd = Path.cwd()
+            path = (cwd / path).resolve()
         
         path_str = str(path)
         

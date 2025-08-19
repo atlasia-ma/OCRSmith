@@ -19,18 +19,16 @@ class TestPerformance:
         # Should complete 100 placements in under 1 second
         assert (end_time - start_time) < 1.0
     
-    def test_augmentation_pipeline_performance(self, sample_text_image):
-        """Test augmentation pipeline performance"""
-        from ocrsmith.core import AugmentationPipeline, NoiseAugmentation
-        
-        pipeline = AugmentationPipeline()
-        pipeline.add_augmentation(NoiseAugmentation(noise_factor=0.1), probability=1.0)
-        
+    def test_noise_augmentation_performance(self, sample_text_image):
+        """Basic performance smoke test for a single augmentation strategy"""
+        from ocrsmith.core.augmentation.strategies import NoiseAugmentation
+
+        aug = NoiseAugmentation(noise_factor=0.1)
+
         start_time = time.time()
-        for _ in range(10):  # Fewer iterations for image processing
-            result = pipeline.apply_all(sample_text_image)
+        for _ in range(10):
+            _ = aug.apply(sample_text_image)
         end_time = time.time()
-        
-        # Should complete 10 augmentations in under 2 seconds
+
         assert (end_time - start_time) < 2.0
         

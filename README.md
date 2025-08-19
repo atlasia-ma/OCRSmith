@@ -111,7 +111,7 @@ from ocrsmith.core.backgrounds.creators import *
 from ocrsmith.config import load_config
 from ocrsmith.core.FontManager import FontManager
 from ocrsmith.core.TextRenderer import TextRenderer
-from ocrsmith.core.text_renderers.renderers.HorizontalRenderingStrategy import HorizontalRenderingStrategy
+from ocrsmith.core.text_renderers.strategies.HorizontalRenderingStrategy import HorizontalRenderingStrategy
 from ocrsmith.core.placement import PlacementManager, RandomPlacementStrategy
 
 # Setup background factory
@@ -148,6 +148,23 @@ final_image = placement_result.composed_image
 final_image.save("output.png")
 ```
 
+### CLI Usage
+
+```bash
+python -m ocrsmith.core.app --config path/to/config.yaml --num-samples 100 \
+  --output-dir outputs \
+  --set text_data.source_path=assets/text_data/sentences.csv \
+  --set text_data.text_column=darija_ar \
+  --set seed=123 \
+  --workers 4
+```
+
+Supported overrides (minimal): `output.images_dir`, `output.metadata_file`, `text_data.source_type`, `text_data.source_path`, `text_data.text_column`, `seed`.
+
+Max image constraints:
+- Set in YAML under `layout.max_width` and `layout.max_height` (e.g., 600 and 200). The renderer will trim text words until the rendered image fits.
+- Example snippet in `config/default_config.yaml` shows defaults.
+
 ### Advanced Usage with OCRSmith Engine
 
 ```python
@@ -163,12 +180,17 @@ engine.text_data_manager.load_from_source(
     text_column='text'
 )
 
-# Setup augmentations
-augmentation_config = {
-    'noise': {'enabled': True, 'factor': 0.05, 'probability': 0.3},
-    'blur': {'enabled': True, 'radius': 0.5, 'probability': 0.2}
-}
-engine.setup_augmentations(augmentation_config)
+"""
+Augmentations are configured in YAML. Each augmentation supports `probability` and parameter ranges, e.g.:
+
+augmentations:
+  - type: blur
+    blur_radius: [0.5, 2.0]
+    probability: 0.3
+  - type: rotation
+    max_angle: [0, 5]
+    probability: 0.2
+"""
 
 # Generate dataset
 annotations = engine.generate_dataset(

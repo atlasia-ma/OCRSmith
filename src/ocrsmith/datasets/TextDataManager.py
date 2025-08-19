@@ -12,18 +12,15 @@ class TextDataManager:
         }
         self.current_loader = None
     
-    def load_from_source(self, source_type, source_path, text_column='text', **kwargs):
+    def load_from_source(self, source_type, source_path, text_column='text', title_column=None, **kwargs):
         """Load texts from specified source"""
         if source_type not in self.loaders:
             raise ValueError(f"Unsupported source type: {source_type}")
         
         loader_class = self.loaders[source_type]
-        self.current_loader = loader_class(text_column=text_column)
+        self.current_loader = loader_class(text_column=text_column, title_column=title_column)
         
-        if source_type == 'huggingface':
-            return self.current_loader.load_texts(source_path, **kwargs)
-        else:
-            return self.current_loader.load_texts(source_path, **kwargs)
+        return self.current_loader.load_texts(source_path, **kwargs)
     
     def get_random_text(self):
         """Get a random text from the loaded dataset"""

@@ -1,4 +1,4 @@
-# src/ocrsmith/core/augmentation/augmenters/BlurAugmentation.py
+# src/ocrsmith/core/augmentation/strategies/BlurAugmentation.py
 
 from ..AugmentationStrategy import AugmentationStrategy
 

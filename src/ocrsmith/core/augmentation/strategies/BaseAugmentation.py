@@ -1,4 +1,4 @@
-# src/ocrsmith/core/augmentation/augmenters/BaseAugmentation.py
+# src/ocrsmith/core/augmentation/strategies/BaseAugmentation.py
 
 from abc import abstractmethod
 

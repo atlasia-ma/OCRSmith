@@ -1,4 +1,4 @@
-# src/ocrsmith/core/text_placement/placers/RandomPlacementStrategy.py
+# src/ocrsmith/core/text_placement/strategies/RandomPlacementStrategy.py
 
 from ..TextPlacementStrategy import TextPlacementStrategy
 from ..PlacementResult import PlacementResult
@@ -7,9 +7,14 @@ import random
 
 class RandomPlacementStrategy(TextPlacementStrategy):
     """Places text at random positions within margins"""
-    def __init__(self, margin_x=20, margin_y=20):
-        self.margin_x = margin_x
-        self.margin_y = margin_y
+    def __init__(self, margin: int = None, margin_x: int = 20, margin_y: int = 20):
+        # Allow single 'margin' from config to set both axes if provided
+        if margin is not None:
+            self.margin_x = margin
+            self.margin_y = margin
+        else:
+            self.margin_x = margin_x
+            self.margin_y = margin_y
     
     def place_text(self, text_image, background_image, **kwargs) -> PlacementResult:
         bg_w, bg_h = background_image.size

@@ -1,1 +1,1 @@
-from .renderers import HorizontalRenderingStrategy
+from .strategies import HorizontalRenderingStrategy

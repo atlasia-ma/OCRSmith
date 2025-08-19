@@ -1,4 +1,4 @@
-# src/ocrsmith/core/augmentation/augmenters/BrightnessAugmentation.py
+# src/ocrsmith/core/augmentation/strategies/BrightnessAugmentation.py
 
 from ..AugmentationStrategy import AugmentationStrategy
 

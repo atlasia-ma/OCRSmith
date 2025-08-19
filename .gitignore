@@ -207,3 +207,5 @@ test.py
 
 training_data
 assets/text_data
+outputs
+test_output

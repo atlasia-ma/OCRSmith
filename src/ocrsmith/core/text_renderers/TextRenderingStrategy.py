@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 class TextRenderingStrategy(ABC):
     @abstractmethod
-    def render_text():
-        pass
+    def render_text(self, font, text, **kwargs):
+        """Render text to an image, returning (image, mask, (w, h))."""
+        raise NotImplementedError
     

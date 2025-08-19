@@ -16,6 +16,7 @@ class VerticalRenderingStrategy(BaseTextRenderingStrategy):
         text_color: str,
         stroke_width: int,
         stroke_fill: str = "#282828",
+        **kwargs,
     ) -> tuple:
         
         extra_padding = font.size  # To ensure clean rendering, especially with italic fonts

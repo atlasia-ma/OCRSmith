@@ -1,4 +1,4 @@
-# src/ocrsmith/core/augmentation/augmenters/NoiseAugmentation.py
+# src/ocrsmith/core/augmentation/strategies/NoiseAugmentation.py
 
 from ..AugmentationStrategy import AugmentationStrategy
 

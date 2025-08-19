@@ -1,4 +1,4 @@
-# src/ocrsmith/core/text_renderers/renderers/BaseTextRenderingStrategy.py
+# src/ocrsmith/core/text_renderers/strategies/BaseTextRenderingStrategy.py
 
 from abc import abstractmethod
 
@@ -11,8 +11,8 @@ from PIL.ImageFont import FreeTypeFont
 
 class BaseTextRenderingStrategy(TextRenderingStrategy):
     @abstractmethod
-    def render_text():
-        pass
+    def render_text(self, font: FreeTypeFont, text: str, **kwargs):
+        raise NotImplementedError
     
     def _prepare_canvas(
         self, width: int, height: int

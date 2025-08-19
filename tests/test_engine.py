@@ -1,171 +1,168 @@
-import pytest 
-from unittest.mock import Mock, MagicMock, patch, mock_open
-import tempfile 
-import os 
-import json 
- 
-from ocrsmith.core import OCRSmithEngine 
-from ocrsmith.core.text_placement import PlacementResult 
- 
-class TestOCRSmithEngine: 
-    """Test OCRSmithEngine""" 
-     
-    @pytest.fixture 
-    def mock_engine(self, sample_config): 
-        """Create an engine with mocked dependencies""" 
-        with patch('ocrsmith.core.OCRSmithEngine.PlacementManager'), \
-             patch('ocrsmith.core.OCRSmithEngine.TextDataManager'), \
-             patch('ocrsmith.core.OCRSmithEngine.AugmentationPipeline'):
-             
-            engine = OCRSmithEngine(sample_config) 
-             
-            # Mock managers 
-            engine.background_manager = Mock() 
-            engine.font_manager = Mock() 
-             
-            return engine 
-     
-    def test_engine_initialization(self, sample_config): 
-        with patch('ocrsmith.core.OCRSmithEngine.PlacementManager'), \
-             patch('ocrsmith.core.OCRSmithEngine.TextDataManager'), \
-             patch('ocrsmith.core.OCRSmithEngine.AugmentationPipeline'):
-             
-            engine = OCRSmithEngine(sample_config) 
-             
-            assert engine.config == sample_config 
-            assert engine.placement_manager is not None 
-            assert engine.text_data_manager is not None 
-            assert engine.augmentation_pipeline is not None 
-     
-    def test_setup_augmentations(self, mock_engine): 
-        augmentation_config = { 
-            'noise': {'enabled': True, 'factor': 0.1, 'probability': 0.5}, 
-            'blur': {'enabled': True, 'radius': 1.0, 'probability': 0.3} 
-        } 
-         
-        mock_engine.setup_augmentations(augmentation_config) 
-         
-        # Should have called add_augmentation twice 
-        assert mock_engine.augmentation_pipeline.add_augmentation.call_count == 2 
-     
-    @patch('ocrsmith.core.OCRSmithEngine.TextRenderer') 
-    @patch('PIL.Image.new') 
-    def test_generate_sample(self, mock_image_new, mock_text_renderer_class, mock_engine): 
-        # Setup mocks 
-        mock_font = Mock() 
-        mock_engine.font_manager.load_font.return_value = mock_font 
-         
-        mock_text_renderer = Mock() 
-        mock_text_renderer_class.return_value = mock_text_renderer 
-         
-        mock_text_image = Mock() 
-        mock_text_image.size = (100, 50) 
-        mock_text_renderer.generate_text_image.return_value = (mock_text_image, None, (100, 50)) 
-         
-        mock_background_creator = Mock() 
-        mock_background_image = Mock() 
-        mock_background_image.convert.return_value = mock_background_image 
-        mock_background_creator.render.return_value = mock_background_image 
-        mock_engine.background_manager.get_random_background.return_value = mock_background_creator 
-         
-        mock_engine.text_data_manager.get_random_text.return_value = "Test text" 
-         
-        # Mock placement result 
-        mock_composed_image = Mock() 
-        mock_placement_result = PlacementResult( 
-            mock_composed_image,  
-            (10, 20, 110, 70),  
-            {'placement_type': 'test'} 
-        ) 
-        mock_engine.placement_manager.place_text.return_value = mock_placement_result 
-         
-        mock_engine.augmentation_pipeline.apply_all.return_value = mock_composed_image 
-         
-        # Test generate_sample 
-        result = mock_engine.generate_sample(placement_strategy='random') 
-         
-        image, text, bbox, metadata = result 
-         
-        assert image == mock_composed_image 
-        assert text == "Test text" 
-        assert bbox == (10, 20, 110, 70) 
-        assert metadata == {'placement_type': 'test'} 
-     
-    def test_generate_sample_no_text_raises_error(self, mock_engine): 
-        mock_engine.text_data_manager.get_random_text.return_value = None 
-         
-        with pytest.raises(ValueError, match="No text provided"): 
-            mock_engine.generate_sample() 
-     
-    @pytest.fixture
-    def temp_dir(self):
-        """Create a temporary directory for testing"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
-     
-    @patch('os.makedirs') 
-    @patch('builtins.open', new_callable=mock_open) 
-    @patch('json.dump') 
-    def test_generate_dataset(self, mock_json_dump, mock_file, mock_makedirs, mock_engine, temp_dir): 
-        # Mock generate_sample to return consistent results 
-        mock_image = Mock() 
-        mock_image.save = Mock() 
-         
-        def mock_generate_sample(**kwargs): 
-            return mock_image, "test text", (0, 0, 100, 50), {'type': 'test'} 
-         
-        mock_engine.generate_sample = Mock(side_effect=mock_generate_sample) 
-         
-        # Test generate_dataset 
-        annotations = mock_engine.generate_dataset(num_samples=2, output_dir=temp_dir) 
-         
-        # Verify results 
-        assert len(annotations) == 2 
-        assert mock_engine.generate_sample.call_count == 2 
-        assert mock_image.save.call_count == 2 
-        mock_makedirs.assert_called_once_with(temp_dir, exist_ok=True) 
-        mock_json_dump.assert_called_once() 
+# tests/core/test_ocrsmith_engine.py
+import pytest
+from unittest.mock import Mock, patch, mock_open
+import tempfile
+import os
+import json
+from PIL import Image
+import yaml
+
+# --- Import all necessary classes ---
+from ocrsmith.config.schema import AppConfig
+from ocrsmith.core.OCRSmithEngine import OCRSmithEngine
+from ocrsmith.core.text_placement import PlacementResult
+
+# --- Fixtures ---
+
+@pytest.fixture
+def app_config():
+    """
+    Provides a real, valid AppConfig object loaded from a YAML string.
+    Using the default 'function' scope ensures each test gets a fresh
+    instance, preventing state leakage between tests.
+    """
+    # This YAML is based on the detailed config you provided.
+    # Using a real config structure avoids mocking issues with Pydantic models.
+    yaml_string = """
+    fonts:
+      - path: 'assets/fonts/dummy.ttf'
+        size: 24
+    text_data:
+      source_type: 'csv'
+      source_path: 'assets/text_data/dummy.csv'
+      text_column: 'text'
+    backgrounds:
+      - type: solid
+        color: [255, 255, 255]
+      - type: gradient
+        start_color: [220, 220, 255]
+        end_color: [255, 220, 220]
+    text_renderers:
+      - type: horizontal
+    text_placements:
+      - type: random
+        margin: 50
+    augmentations: []
+    layout:
+      type: simple
+    output:
+      images_dir: 'outputs/images'
+      metadata_file: 'outputs/metadata.jsonl'
+    """
+    config_dict = yaml.safe_load(yaml_string)
+    return AppConfig.model_validate(config_dict)
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing file output."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield tmpdir
+
+# --- Test Class for the Engine ---
+
+# Patch all managers at the class level to ensure they are mocked for every test.
+# This prevents real managers from being initialized with mock configs.
+@patch('ocrsmith.core.OCRSmithEngine.BackgroundManager')
+@patch('ocrsmith.core.OCRSmithEngine.TextRenderingManager')
+@patch('ocrsmith.core.OCRSmithEngine.TextPlacementManager')
+@patch('ocrsmith.core.OCRSmithEngine.AugmentationManager')
+@patch('ocrsmith.core.OCRSmithEngine.FontManager')
+@patch('ocrsmith.core.OCRSmithEngine.TextDataManager')
+class TestOCRSmithEngine:
+    """Tests for the main OCRSmithEngine class with all dependencies mocked."""
+
+    def test_engine_initialization(self, mock_data, mock_font, mock_aug, mock_placement, mock_render, mock_bg, app_config):
+        """Test that the engine initializes all its managers correctly."""
+        engine = OCRSmithEngine(app_config)
+
+        assert engine.config == app_config
+        mock_bg.assert_called_once_with(app_config)
+        mock_render.assert_called_once_with(app_config)
+        mock_placement.assert_called_once_with(app_config)
+        mock_aug.assert_called_once_with(app_config)
+        mock_font.assert_called_once_with(app_config)
+        mock_data.assert_called_once()
+
+    def test_generate_sample(self, mock_data, mock_font, mock_aug, mock_placement, mock_render, mock_bg, app_config):
+        """Test the logic of generating a single sample image."""
+        # Ensure augmentations list is not empty for this specific test
+        # This modification is safe because the fixture has function scope.
+        app_config.augmentations = [Mock()]
         
-        # Verify the structure of annotations
-        for annotation in annotations:
-            assert 'image_path' in annotation
-            assert 'text' in annotation
-            assert 'bbox' in annotation
-            assert 'placement_metadata' in annotation
-     
-    def test_generate_dataset_handles_errors(self, mock_engine, temp_dir): 
-        # Mock generate_sample to raise an exception 
-        mock_engine.generate_sample = Mock(side_effect=Exception("Test error")) 
-         
-        with patch('builtins.print') as mock_print: 
-            annotations = mock_engine.generate_dataset(num_samples=2, output_dir=temp_dir) 
-         
-        # Should continue despite errors 
-        assert len(annotations) == 0 
-        assert mock_print.call_count >= 2  # Error messages
+        engine = OCRSmithEngine(app_config)
+
+        # --- Setup Mocks for all manager instances ---
+        engine.font_manager.get_random_font.return_value = Mock()
+
+        mock_text_image = Image.new('RGBA', (100, 50))
+        mock_render_context = Mock()
+        mock_render_context.render_text.return_value = (mock_text_image, None, (100, 50))
+        engine.text_rendering_manager.get_random_text_renderer.return_value = mock_render_context
+
+        mock_background_image = Image.new('RGB', (200, 150))
+        mock_bg_context = Mock()
+        mock_bg_context.render.return_value = mock_background_image
+        engine.background_manager.get_random_background.return_value = mock_bg_context
+
+        mock_composed_image = Image.new('RGB', (200, 150))
+        mock_placement_result = PlacementResult(
+            composed_image=mock_composed_image,
+            bbox=(10, 20, 110, 70),
+            metadata={'placement_type': 'random'}
+        )
+        mock_placement_context = Mock()
+        mock_placement_context.place_text.return_value = mock_placement_result
+        engine.text_placement_manager.get_random_placement.return_value = mock_placement_context
         
-    def test_generate_dataset_creates_valid_filenames(self, mock_engine, temp_dir):
-        """Test that generated filenames follow expected pattern"""
-        mock_image = Mock()
-        mock_image.save = Mock()
-        
-        def mock_generate_sample(**kwargs):
-            return mock_image, "test text", (0, 0, 100, 50), {'type': 'test'}
-        
-        mock_engine.generate_sample = Mock(side_effect=mock_generate_sample)
-        
-        with patch('os.makedirs'), \
-             patch('builtins.open', mock_open()), \
-             patch('json.dump'):
-            
-            annotations = mock_engine.generate_dataset(num_samples=3, output_dir=temp_dir)
-        
-        # Check that image paths are properly formatted
-        expected_paths = [
-            os.path.join(temp_dir, 'sample_000000.png'),
-            os.path.join(temp_dir, 'sample_000001.png'), 
-            os.path.join(temp_dir, 'sample_000002.png')
+        # Pipeline-based augmentation now used in engine; return composed image
+        engine.augmentation_manager.apply_pipeline.return_value = mock_composed_image
+
+        # --- Call the method ---
+        image, text, bbox, metadata = engine.generate_sample(text="Hello World")
+
+        # --- Assertions ---
+        assert isinstance(image, Image.Image)
+        assert text == "Hello World"
+        assert bbox == (10, 20, 110, 70)
+        assert metadata.get('placement_type') == 'random'
+
+    def test_generate_sample_no_text_raises_error(self, mock_data, mock_font, mock_aug, mock_placement, mock_render, mock_bg, app_config):
+        """Test that generate_sample raises a ValueError if text is empty."""
+        engine = OCRSmithEngine(app_config)
+        with pytest.raises(ValueError, match="Text must be provided to generate a sample."):
+            engine.generate_sample(text="")
+
+    @patch('os.makedirs')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('json.dump')
+    def test_generate_test_dataset(self, mock_json_dump, mock_file, mock_makedirs, mock_bg, mock_render, mock_placement, mock_aug, mock_font, mock_data, app_config, temp_dir):
+        """Test the full dataset generation loop, including file I/O."""
+        engine = OCRSmithEngine(app_config)
+
+        mock_image = Mock(spec=Image.Image)
+        engine.generate_sample = Mock(
+            return_value=(mock_image, "test", (0, 0, 10, 10), {})
+        )
+
+        engine.text_data_manager.load_from_source = Mock()
+        engine.text_data_manager.get_random_text.return_value = "test"
+
+        # --- Call the method ---
+        annotations = engine.generate_test_dataset(num_samples=3, output_dir=temp_dir)
+
+        # --- Assertions ---
+        assert engine.text_data_manager.load_from_source.called
+        assert engine.generate_sample.call_count == 3
+        mock_makedirs.assert_called_once_with(temp_dir, exist_ok=True)
+
+        expected_save_paths = [
+            os.path.join(temp_dir, 'sample_0000.png'),
+            os.path.join(temp_dir, 'sample_0001.png'),
+            os.path.join(temp_dir, 'sample_0002.png'),
         ]
-        actual_paths = [ann['image_path'] for ann in annotations]
-        
-        assert actual_paths == expected_paths
+        saved_paths = [call.args[0] for call in mock_image.save.call_args_list]
+        assert saved_paths == expected_save_paths
+
+        assert len(annotations) == 3
+        assert annotations[0]['text'] == 'test'
+        mock_json_dump.assert_called_once()

@@ -1,4 +1,4 @@
-# src/ocrsmith/core/augmentation/augmenters/RotationAugmentation.py
+# src/ocrsmith/core/augmentation/strategies/RotationAugmentation.py
 
 from ..AugmentationStrategy import AugmentationStrategy
 

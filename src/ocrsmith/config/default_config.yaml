@@ -1,17 +1,137 @@
+# config.yaml - Fixed to match your actual strategy types
 fonts:
-  - path: assets/fonts/arial.ttf
-    size: 32
+  - path: assets/fonts/Amiri-Bold.ttf
+  - path: assets/fonts/Vazirmatn-ExtraBold.ttf
+  - path: assets/fonts/Mada-Bold.ttf
+  - path: assets/fonts/Amiri-Bold.ttf
+  - path: assets/fonts/NotoSansArabic_Condensed-Bold.ttf
+  - path: assets/fonts/NotoSansArabic_ExtraCondensed-ExtraBold.ttf
+  - path: assets/fonts/NotoNaskhArabic-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic-ExtraBold.ttf
+  - path: assets/fonts/Mada-SemiBold.ttf
+  - path: assets/fonts/Fustat-ExtraBold.ttf
+  - path: assets/fonts/NotoKufiArabic-ExtraBold.ttf
+  - path: assets/fonts/NotoSansArabic_Condensed-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic_ExtraCondensed-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic_Condensed-ExtraBold.ttf
+  - path: assets/fonts/Fustat-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic-Bold.ttf
+  - path: assets/fonts/NotoKufiArabic-SemiBold.ttf
+  - path: assets/fonts/Amiri-BoldItalic.ttf
+  - path: assets/fonts/Vazirmatn-Bold.ttf
+  - path: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic_SemiCondensed-Bold.ttf
+  - path: assets/fonts/NotoNaskhArabic-Bold.ttf
+  - path: assets/fonts/NotoKufiArabic-Bold.ttf
+  - path: assets/fonts/NotoSansArabic-SemiBold.ttf
+  - path: assets/fonts/NotoSansArabic_SemiCondensed-ExtraBold.ttf
+  - path: assets/fonts/Vazirmatn-SemiBold.ttf
+  - path: assets/fonts/IBMPlexSansArabic-Bold.ttf
+  - path: assets/fonts/NotoSansArabic_SemiCondensed-SemiBold.ttf
+  - path: assets/fonts/Fustat-Bold.ttf
+  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Bold.ttf
+  - path: assets/fonts/Vazirmatn-Medium.ttf
+  - path: assets/fonts/NotoSansArabic_Condensed-Medium.ttf
+  - path: assets/fonts/NotoSansArabic_SemiCondensed-Medium.ttf
+  - path: assets/fonts/Fustat-Medium.ttf
+  - path: assets/fonts/Mada-Medium.ttf
+  - path: assets/fonts/NotoSansArabic-Medium.ttf
+  - path: assets/fonts/NotoNaskhArabic-Medium.ttf
+  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Medium.ttf
+  - path: assets/fonts/IBMPlexSansArabic-Medium.ttf
+  - path: assets/fonts/NotoKufiArabic-Medium.ttf
+  - path: assets/fonts/NotoSansArabic_Condensed-Regular.ttf
+  - path: assets/fonts/Mada-Regular.ttf
+  - path: assets/fonts/NotoSansArabic_SemiCondensed-Regular.ttf
+  - path: assets/fonts/Fustat-Regular.ttf
+  - path: assets/fonts/NotoSansArabic-Regular.ttf
+  - path: assets/fonts/NotoNaskhArabic-Regular.ttf
+  - path: assets/fonts/Vazirmatn-Regular.ttf
+  - path: assets/fonts/IBMPlexSansArabic-Regular.ttf
+  - path: assets/fonts/NotoKufiArabic-Regular.ttf
+  - path: assets/fonts/Amiri-Regular.ttf
+  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Regular.ttf
+
+# text_data:
+#   source_type: 'csv'
+#   source_path: 'assets/text_data/sentences.csv'
+#   text_column: 'darija_ar'
+
+
+text_data:
+  source_type: 'huggingface'
+  source_path: 'atlasia/Moroccan-Darija-Wiki-Dataset'
+  text_column: 'content'
+  title_column: 'title'
+
 backgrounds:
-  - type: noise
-    noise_type: gaussian  
+  # Image Backgrounds
   - type: image
-    image_path: 'assets/backgrounds/test_default_background_2.png'  
+    image_path: "assets/backgrounds/white_paper.jpg"
+    mode: crop
+  - type: image
+    image_path: "assets/backgrounds/blue.jpg"
+    mode: crop
+
+    
+  # Solid Color Backgrounds
+  - type: solid
+    color: [255, 255, 255]  # White
+  - type: solid
+    color: [240, 240, 240]  # Light gray
+  - type: solid
+    color: [200, 220, 255]  # Light blue
+  - type: solid
+    color: [255, 248, 220]  # Cream
+    
+  # Gradient Backgrounds
+  - type: gradient
+    start_color: [224, 255, 255]  # Light Cyan Blue
+    end_color: [240, 255, 240]    # Light Mint Green
+    direction: vertical
+  - type: gradient
+    start_color: [224, 255, 255]  # Light Cyan Blue
+    end_color: [240, 255, 240]    # Light Mint Green
+    direction: diagonal
+  - type: gradient
+    start_color: [173, 216, 230]  # Pastel Blue
+    end_color: [152, 251, 152]    # Pale Seafoam Green
+    direction: horizontal
+    
+  # Texture Backgrounds
+  - type: texture
+    base_color: [240, 240, 240]
+    noise_level: 6
+  - type: texture
+    base_color: [255, 248, 220]
+    noise_level: 15
+  - type: texture
+    base_color: [230, 230, 255]
+    noise_level: 10
+
+text_renderers:
+  - type: horizontal
+    weight: 1.0
+
+text_placements:
+  - type: center
+  - type: random
+  # - type: page_number
+  # - type: page_title
+
+augmentations: []
+
 
 layout:
   type: simple
+  padding: 50
+  max_width: 600
+  max_height: 200
+
 output:
   images_dir: outputs/images
   metadata_file: outputs/metadata.jsonl
+
 dataset:
   source: csv
   path: data/input.csv

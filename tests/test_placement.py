@@ -10,7 +10,7 @@ from ocrsmith.core.text_placement import (
     PageTitlePlacementStrategy,
     PageNumberPlacementStrategy,
 )
-from ocrsmith.core import PlacementManager
+from ocrsmith.core.TextPlacementManager import TextPlacementManager
 
 class TestPlacementResult:
     """Test PlacementResult class"""
@@ -121,80 +121,25 @@ class TestPageNumberPlacementStrategy:
         assert result.metadata['placement_type'] == 'page_number'
         assert result.metadata['content_type'] == 'page_number'
 
-class TestPlacementManager:
-    """Test PlacementManager"""
+class TestTextPlacementManager:
+    """Tests for TextPlacementManager registry-driven selection"""
     
-    def test_register_and_get_strategy(self):
-        manager = PlacementManager()
-        # First register the default strategy to avoid KeyError
-        default_strategy = RandomPlacementStrategy()
-        manager.register_strategy('random', default_strategy)
-        
-        # Then register and test the specific strategy
-        test_strategy = RandomPlacementStrategy()
-        manager.register_strategy('test', test_strategy)
-        
-        assert manager.get_strategy('test') == test_strategy
-    
-    def test_default_strategy(self):
-        manager = PlacementManager()
-        default_strategy = RandomPlacementStrategy()
-        manager.register_strategy('random', default_strategy)
-        
-        assert manager.get_strategy() == default_strategy
-        assert manager.get_strategy(None) == default_strategy
-    
-    def test_get_strategy_fallback_to_default(self):
-        manager = PlacementManager()
-        default_strategy = RandomPlacementStrategy()
-        manager.register_strategy('random', default_strategy)
-        
-        # Request non-existent strategy, should return default
-        result = manager.get_strategy('nonexistent')
-        assert result == default_strategy
-    
-    def test_place_text_integration(self, sample_text_image, sample_background_image):
-        manager = PlacementManager()
-        
-        # Register default strategy first
-        default_strategy = RandomPlacementStrategy()
-        manager.register_strategy('random', default_strategy)
-        
-        # Register test strategy
-        strategy = Mock()
-        expected_result = PlacementResult(sample_text_image, (0, 0, 100, 50))
-        strategy.place_text.return_value = expected_result
-        manager.register_strategy('test', strategy)
-        
-        result = manager.place_text(sample_text_image, sample_background_image, 'test')
-        
-        assert result == expected_result
-        strategy.place_text.assert_called_once_with(sample_text_image, sample_background_image)
-    
-    def test_place_text_with_default_strategy(self, sample_text_image, sample_background_image):
-        manager = PlacementManager()
-        
-        # Mock the default strategy
-        default_strategy = Mock()
-        expected_result = PlacementResult(sample_text_image, (10, 10, 110, 60))
-        default_strategy.place_text.return_value = expected_result
-        manager.register_strategy('random', default_strategy)
-        
-        # Call without specifying strategy (should use default)
-        result = manager.place_text(sample_text_image, sample_background_image)
-        
-        assert result == expected_result
-        default_strategy.place_text.assert_called_once_with(sample_text_image, sample_background_image)
-    
-    def test_get_strategy_raises_error_when_not_found(self):
-        manager = PlacementManager()
-        
-        with pytest.raises(ValueError, match="Strategy 'nonexistent' not found"):
-            manager.get_strategy('nonexistent')
-    
-    def test_get_strategy_raises_error_when_default_not_found(self):
-        manager = PlacementManager()
-        
-        with pytest.raises(ValueError, match="Strategy 'random' not found"):
-            manager.get_strategy()
+    def test_get_random_uses_config_params(self, monkeypatch):
+        # Build a minimal config dict matching schema
+        from ocrsmith.config.schema import AppConfig
+        config = AppConfig.model_validate({
+            'fonts': [{'path': 'assets/fonts/dummy.ttf'}],
+            'backgrounds': [{'type': 'solid', 'color': [255, 255, 255]}],
+            'text_renderers': [{'type': 'horizontal'}],
+            'text_placements': [{'type': 'random', 'margin': 13}],
+            'augmentations': [],
+            'layout': {'type': 'simple'},
+            'output': {'images_dir': 'out', 'metadata_file': 'out.jsonl'}
+        })
+
+        manager = TextPlacementManager(config)
+        ctx = manager.get_random_placement()
+        strategy = ctx._strategy
+        assert isinstance(strategy, RandomPlacementStrategy)
+        assert strategy.margin_x == 13 and strategy.margin_y == 13
             

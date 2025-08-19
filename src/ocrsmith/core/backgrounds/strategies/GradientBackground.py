@@ -35,11 +35,22 @@ class GradientBackground(BaseBackground):
                 draw.line([(0, y), (width, y)], fill=color)
         
         elif direction == 'diagonal':
-            for y in range(height):
-                for x in range(width):
-                    ratio = (x + y) / (width + height)
-                    color = self._interpolate_color(start_color, end_color, ratio)
-                    img.putpixel((x, y), color)
+            # Vectorized diagonal gradient
+            try:
+                import numpy as np
+                yy, xx = np.mgrid[0:height, 0:width]
+                ratio = (xx + yy) / float(width + height)
+                ratio = ratio[..., None]
+                start = np.array(start_color, dtype=np.float32)
+                end = np.array(end_color, dtype=np.float32)
+                arr = (start + (end - start) * ratio).astype(np.uint8)
+                return Image.fromarray(arr, mode='RGB')
+            except Exception:
+                for y in range(height):
+                    for x in range(width):
+                        ratio = (x + y) / (width + height)
+                        color = self._interpolate_color(start_color, end_color, ratio)
+                        img.putpixel((x, y), color)
         
         return img
     

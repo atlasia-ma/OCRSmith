@@ -1,4 +1,4 @@
-# src/ocrsmith/core/text_placement/placers/GridPlacementStrategy.py
+# src/ocrsmith/core/text_placement/strategies/GridPlacementStrategy.py
 
 from ..TextPlacementStrategy import TextPlacementStrategy
 from ..PlacementResult import PlacementResult

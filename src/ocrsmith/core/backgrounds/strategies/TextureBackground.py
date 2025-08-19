@@ -2,6 +2,7 @@
 from .BaseBackground import BaseBackground
 from PIL import Image
 import random
+import numpy as np
 from typing import Tuple
 
 class TextureBackground(BaseBackground):
@@ -17,16 +18,8 @@ class TextureBackground(BaseBackground):
         base_color = kwargs.get('base_color', self.default_base_color)
         noise_level = kwargs.get('noise_level', self.default_noise_level)
         
-        img = Image.new('RGB', (width, height), base_color)
-        pixels = img.load()
-        
-        for y in range(height):
-            for x in range(width):
-                # Add random noise to base color
-                noise = random.randint(-noise_level, noise_level)
-                r = max(0, min(255, base_color[0] + noise))
-                g = max(0, min(255, base_color[1] + noise))
-                b = max(0, min(255, base_color[2] + noise))
-                pixels[x, y] = (r, g, b)
-        
-        return img
+        # Vectorized noise generation for performance
+        base = np.full((height, width, 3), base_color, dtype=np.int16)
+        noise = np.random.randint(-noise_level, noise_level + 1, size=(height, width, 1), dtype=np.int16)
+        noisy = np.clip(base + noise, 0, 255).astype(np.uint8)
+        return Image.fromarray(noisy, mode='RGB')
