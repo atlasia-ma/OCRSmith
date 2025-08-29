@@ -87,6 +87,10 @@ OCRSmith/
 ## 📦 Installation
 
 ```bash
+# Create and activate conda environment
+conda create -n ocrsmith python=3.10 -y
+conda activate ocrsmith
+
 # Clone the repository
 git clone https://github.com/yourusername/OCRSmith.git
 cd OCRSmith
@@ -96,6 +100,7 @@ pip install .
 
 # Install in development mode
 pip install -e .
+
 ```
 
 ---
@@ -162,6 +167,7 @@ python -m ocrsmith.core.app --config path/to/config.yaml --num-samples 100 \
 Supported overrides (minimal): `output.images_dir`, `output.metadata_file`, `text_data.source_type`, `text_data.source_path`, `text_data.text_column`, `seed`.
 
 Max image constraints:
+
 - Set in YAML under `layout.max_width` and `layout.max_height` (e.g., 600 and 200). The renderer will trim text words until the rendered image fits.
 - Example snippet in `config/default_config.yaml` shows defaults.
 
@@ -311,15 +317,15 @@ class CustomPlacementStrategy(TextPlacementStrategy):
     def place_text(self, text_image, background_image, **kwargs):
         # Custom placement logic
         x, y = self.calculate_position(text_image, background_image)
-      
+  
         # Compose image
         composed_image = background_image.copy()
         composed_image.paste(text_image, (x, y), text_image)
-      
+  
         # Return result with metadata
         bbox = (x, y, x + text_image.size[0], y + text_image.size[1])
         metadata = {'placement_type': 'custom', 'position': (x, y)}
-      
+  
         return PlacementResult(composed_image, bbox, metadata)
 
 # Register custom strategy
@@ -350,16 +356,16 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ### Development Setup
 
 ```bash
-# Clone repository
+# Create and activate conda environment
+conda create -n ocrsmith python=3.10 -y
+conda activate ocrsmith
+
+# Clone the repository
 git clone https://github.com/yourusername/OCRSmith.git
 cd OCRSmith
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
 # Install in development mode
-pip install -e ".[dev]"
+pip install -e .
 
 # Run tests
 pytest tests/
@@ -375,17 +381,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Font providers for high-quality Arabic and Latin fonts
-- The OCR community for inspiration and feedback
-- Contributors who help improve OCRSmith
+Font providers for high-quality Arabic and Latin fonts
 
----
+The OCR community for inspiration and feedback
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/OCRSmith/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/OCRSmith/discussions)
-- **Documentation**: [Full Documentation](https://ocrsmith.readthedocs.io)
+Contributors who help improve OCRSmith
 
 ---
 
