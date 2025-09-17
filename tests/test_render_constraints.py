@@ -33,5 +33,3 @@ def test_horizontal_trims_to_max_width_height(monkeypatch):
     # Height should be <= 20 and width <= 60
     assert w_pixels <= 60
     assert h_pixels <= 20
-
-

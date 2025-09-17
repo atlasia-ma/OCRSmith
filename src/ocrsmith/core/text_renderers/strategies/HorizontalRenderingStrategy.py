@@ -9,12 +9,12 @@ import random as rnd
 
 from ...FontManager import FontManager
 
-
 def wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_height=None):
     lines = []
     if not line_height:
         line_height = FontManager.get_text_height(font)
     text_height = 0
+    
     for paragraph in paragraphs:
         words = paragraph.split()          
         current_line = ''
@@ -24,15 +24,27 @@ def wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_h
             if w <= max_width:
                 current_line = test_line
             else:
-                lines.append(current_line)
+                # Add current line if it fits in height
+                if current_line:  # Don't add empty lines
+                    if text_height + line_height + spacing <= max_height:
+                        lines.append(current_line)
+                        text_height += line_height + spacing
+                    else:
+                        break  # Stop if adding this line would exceed max_height
                 current_line = word
+                
+                # Check if single word exceeds max_width
+                if FontManager.get_text_width(font, word) > max_width:
+                    # Handle very long words - you might want to break them or skip them
+                    current_line = word  # Keep it anyway, but it will overflow
 
-        if text_height <= max_height:
-            lines.append(current_line)
-            text_height += line_height + spacing
-        else:
-            break
-
+        # Add the last line of the paragraph
+        if current_line:
+            if text_height + line_height <= max_height:
+                lines.append(current_line)
+                text_height += line_height + spacing
+            else:
+                break  # Stop if adding this line would exceed max_height
 
     return lines
 

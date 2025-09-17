@@ -162,24 +162,20 @@ class OCRSmithEngine:
         if not self.config.text_data:
             raise ValueError("`text_data` configuration is missing from the config file.")
 
-        print("Loading text data source...")
         text_config = self.config.text_data.model_dump()
         source_type = text_config.pop('source_type')
         source_path = text_config.pop('source_path')
         
+        # Load texts (TextDataManager.load_from_source may return texts or set current_loader)
         self.text_data_manager.load_from_source(
             source_type=source_type,
             source_path=source_path,
             **text_config # Pass the rest of the config as kwargs
         )
-        print(self.text_data_manager.current_loader.texts[0:10])
-        print("Text data loaded successfully.")
 
         os.makedirs(output_dir, exist_ok=True)
         
         annotations = []
-        
-        print(f"Generating {num_samples} test samples...")
         
         texts = []
         for _ in range(num_samples):

@@ -153,57 +153,32 @@ final_image = placement_result.composed_image
 final_image.save("output.png")
 ```
 
-### CLI Usage
+### CLI Usage (examples)
 
+You can run the app directly with command-line overrides:
+
+- Example 1 — set source path/type/column inline:
 ```bash
-python -m ocrsmith.core.app --config path/to/config.yaml --num-samples 100 \
-  --output-dir outputs \
+python -m ocrsmith.core.app --num-samples 100 --output-dir outputs \
   --set text_data.source_path=assets/text_data/sentences.csv \
+  --set text_data.source_type=csv \
   --set text_data.text_column=darija_ar \
   --set seed=123 \
   --workers 4
 ```
 
-Supported overrides (minimal): `output.images_dir`, `output.metadata_file`, `text_data.source_type`, `text_data.source_path`, `text_data.text_column`, `seed`.
-
-Max image constraints:
-
-- Set in YAML under `layout.max_width` and `layout.max_height` (e.g., 600 and 200). The renderer will trim text words until the rendered image fits.
-- Example snippet in `config/default_config.yaml` shows defaults.
-
-### Advanced Usage with OCRSmith Engine
-
-```python
-from ocrsmith.core import OCRSmithEngine
-
-# Initialize engine
-engine = OCRSmithEngine(configs)
-
-# Load text data from CSV
-engine.text_data_manager.load_from_source(
-    'csv', 
-    'data/texts.csv', 
-    text_column='text'
-)
-
-"""
-Augmentations are configured in YAML. Each augmentation supports `probability` and parameter ranges, e.g.:
-
-augmentations:
-  - type: blur
-    blur_radius: [0.5, 2.0]
-    probability: 0.3
-  - type: rotation
-    max_angle: [0, 5]
-    probability: 0.2
-"""
-
-# Generate dataset
-annotations = engine.generate_dataset(
-    num_samples=1000, 
-    output_dir="training_data"
-)
+- Example 2 — specify a config file (update src/ocrsmith/config/default_config.yaml first if needed):
+```bash
+python -m ocrsmith.core.app --config src/ocrsmith/config/default_config.yaml \
+  --num-samples 100 --output-dir outputs --workers 6 --seed 123
 ```
+
+- Example 3 — use the built-in default config (no --config):
+```bash
+python -m ocrsmith.core.app --num-samples 100 --output-dir outputs --workers 6 --seed 123
+```
+
+You can also update the default config file at src/ocrsmith/config/default_config.yaml (fonts, text_data, layout, augmentations, etc.) and run with the --config option shown above.
 
 ---
 
@@ -365,6 +340,31 @@ git clone https://github.com/yourusername/OCRSmith.git
 cd OCRSmith
 
 # Install in development mode
+pip install -e .
+
+# Run tests
+pytest tests/
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+Font providers for high-quality Arabic and Latin fonts
+
+The OCR community for inspiration and feedback
+
+Contributors who help improve OCRSmith
+
+---
+
+*Made with ❤️ for the OCR community*
 pip install -e .
 
 # Run tests
