@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.text`: a text subsystem that owns everything happening to a string before it
+  becomes pixels.
+  - Script and base-direction detection (`detect_script`, `detect_direction`).
+  - `NormalizationPolicy` — opt-in, idempotent transforms for diacritics, tatweel,
+    alef/ya/ta-marbuta unification, numeral systems and whitespace. Each one changes the
+    label, so each one is explicit and recorded.
+  - Bidi/shaping with two interchangeable backends: `TransparentShaper` when Pillow has
+    Raqm, `ReshaperBidiShaper` (arabic-reshaper + python-bidi) otherwise. Both keep the
+    logical string as the label so datasets are identical across machines.
+  - Font glyph coverage via fontTools `cmap` (`supports_text`, `fonts_supporting`), so a
+    font that cannot draw a character is rejected instead of silently emitting tofu.
+
 - Development tooling: ruff lint/format configuration, pytest configuration with
   `pythonpath = ["src"]` (so a clean clone is testable without installing), coverage
   settings, and a GitHub Actions CI matrix over Linux/Windows and Python 3.10/3.12.
