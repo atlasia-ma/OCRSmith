@@ -34,7 +34,10 @@ class IdCardTemplate:
             [
                 (source.phrase(rng, 1), source.phrase(rng, 2)),
                 (source.phrase(rng, 1), source.phrase(rng, 2)),
-                (source.phrase(rng, 2), f"{rng.randint(10, 28)}/{rng.randint(1, 12)}/19{rng.randint(60, 99)}"),
+                (
+                    source.phrase(rng, 2),
+                    f"{rng.randint(10, 28)}/{rng.randint(1, 12)}/19{rng.randint(60, 99)}",
+                ),
                 (source.phrase(rng, 1), f"{rng.randint(100000, 999999)}"),
             ]
         )
@@ -66,9 +69,7 @@ def main() -> None:
     for index in range(args.count):
         for sample in factory.create(index):
             sample.image.save(args.output / f"{sample.id}.png")
-            (args.output / f"{sample.id}.md").write_text(
-                sample.page.to_markdown(), encoding="utf-8"
-            )
+            (args.output / f"{sample.id}.md").write_text(sample.page.to_markdown(), encoding="utf-8")
     print(f"Wrote {args.count} cards to {args.output}")
 
 
