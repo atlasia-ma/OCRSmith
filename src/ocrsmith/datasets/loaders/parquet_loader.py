@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from .BaseTextDataLoader import BaseTextDataLoader
+from .base import BaseTextDataLoader
 
 
 class ParquetTextLoader(BaseTextDataLoader):

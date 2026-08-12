@@ -48,7 +48,7 @@ class TestParquetTextLoader:
 class TestHuggingFaceTextLoader:
     """Test HuggingFaceTextLoader"""
 
-    @patch("ocrsmith.datasets.loaders.HuggingFaceTextLoader.load_dataset")
+    @patch("ocrsmith.datasets.loaders.huggingface_loader.load_dataset")
     def test_load_texts_from_huggingface(self, mock_load_dataset):
         mock_dataset = [
             {"text": "text1", "label": "A"},
@@ -75,7 +75,7 @@ class TestTextDataManager:
         assert len(texts) == 4
         assert isinstance(manager.current_loader, CSVTextLoader)
 
-    @patch("ocrsmith.datasets.loaders.HuggingFaceTextLoader.load_dataset")
+    @patch("ocrsmith.datasets.loaders.huggingface_loader.load_dataset")
     def test_load_from_huggingface_source(self, mock_load_dataset):
         mock_dataset = [{"text": "test text"}]
         mock_load_dataset.return_value = mock_dataset
