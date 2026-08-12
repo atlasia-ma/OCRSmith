@@ -1,4 +1,4 @@
 from .BlurAugmentation import BlurAugmentation
+from .BrightnessAugmentation import BrightnessAugmentation
 from .NoiseAugmentation import NoiseAugmentation
 from .RotationAugmentation import RotationAugmentation
-from .BrightnessAugmentation import BrightnessAugmentation
