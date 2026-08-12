@@ -73,16 +73,14 @@ def wrap_text(
     measure: Measure,
     max_width: float | None,
 ) -> Iterator[str]:
-    """Wrap several paragraphs, yielding an empty string between them.
+    """Wrap several source lines into one flat sequence of drawn lines.
 
-    The blank entries survive as paragraph separators so a caller can render vertical
-    spacing without losing where one paragraph ended and the next began.
+    No blank separators are emitted. A newline in the input means "start a new line", not
+    "leave a gap": vertical space between blocks belongs to the layout engine, which knows
+    the surrounding context. Emitting blanks here would also make a line count returned to
+    a caller disagree with the number of lines actually drawn.
     """
-    first = True
     for paragraph in paragraphs:
-        if not first:
-            yield ""
-        first = False
         yield from wrap_paragraph(paragraph, measure, max_width)
 
 

@@ -17,7 +17,7 @@ from PIL.ImageFont import FreeTypeFont
 
 from ...text.shaping import TextShaper, resolve_shaper
 
-__all__ = ["FontMetrics", "TextExtent"]
+__all__ = ["FontMetrics", "TextExtent", "metrics_for"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,3 +92,28 @@ class FontMetrics:
         advance = float(self.font.getlength(visual))
         x0, y0, x1, y1 = self.font.getbbox(visual)
         return TextExtent(advance, float(x0), float(y0), float(x1), float(y1))
+
+
+#: Metrics are cached per (font file, size, shaper) rather than per call site. Building a
+#: fresh `FontMetrics` for every block would throw away the measurement cache between
+#: blocks, which is most of the cost of laying out a page.
+_METRICS_CACHE: dict[tuple[str, float, str], FontMetrics] = {}
+#: Bound so a long run over many fonts and sizes cannot grow without limit.
+_MAX_CACHED_METRICS = 256
+
+
+def metrics_for(font: FreeTypeFont, shaper: TextShaper | None = None) -> FontMetrics:
+    """Shared `FontMetrics` for a font, reusing its measurement cache across blocks."""
+    shaper = shaper or resolve_shaper()
+    key = (
+        str(getattr(font, "path", id(font))),
+        float(getattr(font, "size", 0)),
+        type(shaper).__name__,
+    )
+    cached = _METRICS_CACHE.get(key)
+    if cached is None:
+        if len(_METRICS_CACHE) >= _MAX_CACHED_METRICS:
+            _METRICS_CACHE.clear()
+        cached = FontMetrics(font, shaper)
+        _METRICS_CACHE[key] = cached
+    return cached
