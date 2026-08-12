@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.core.rendering`: a text renderer that emits pixels and their annotation in
+  the same pass, so the two cannot disagree.
+  - Words are drawn individually, which yields exact per-word boxes and is typographically
+    safe for Arabic (letters never join across a space).
+  - `visual_word_order` implements word-level bidi run reordering, so mixed
+    Arabic/Latin/digit lines are drawn in the right place while the label stays logical.
+  - Wrapping is lossless: no word is silently dropped, oversized words are broken rather
+    than overflowed, and lines that do not fit the height budget are *reported* so the
+    label can be trimmed to exactly what was drawn.
+  - `TextStyle` covers alignment (including natural RTL), line/word spacing, stroke,
+    underline, strikethrough, synthetic bold/italic, and baseline/word-gap jitter, with an
+    injectable `random.Random` so any sample is reproducible.
 - `ocrsmith.text`: a text subsystem that owns everything happening to a string before it
   becomes pixels.
   - Script and base-direction detection (`detect_script`, `detect_direction`).
