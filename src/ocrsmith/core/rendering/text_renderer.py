@@ -25,7 +25,7 @@ from ...domain.geometry import BBox
 from ...text.script import Direction, detect_direction
 from ...text.shaping import TextShaper, resolve_shaper
 from .bidi_layout import visual_word_order
-from .metrics import FontMetrics
+from .metrics import FontMetrics, metrics_for
 from .style import Alignment, TextStyle
 from .wrapping import fit_lines, wrap_text
 
@@ -62,10 +62,19 @@ class RenderedText:
     lines: tuple[Line, ...]
     #: Lines that did not fit the height budget and were therefore not drawn.
     dropped_lines: int = 0
+    #: Transparent margin around the text, so strokes and descenders are not clipped.
+    #: The text origin sits at (padding, padding) inside `image`.
+    padding: int = 0
 
     @property
     def size(self) -> tuple[int, int]:
         return self.image.size
+
+    @property
+    def layout_size(self) -> tuple[int, int]:
+        """Size the block occupies in a layout, excluding the transparent bleed."""
+        width, height = self.image.size
+        return (max(0, width - 2 * self.padding), max(0, height - 2 * self.padding))
 
     @property
     def text(self) -> str:
@@ -81,6 +90,17 @@ class RenderedText:
     def translated(self, dx: float, dy: float) -> tuple[Line, ...]:
         """The annotation as it would read once the block is pasted at (dx, dy)."""
         return tuple(line.translate(dx, dy) for line in self.lines)
+
+    def place(self, canvas: Image.Image, x: float, y: float) -> tuple[Line, ...]:
+        """Composite this block so its text origin lands exactly at (x, y).
+
+        The bleed is compensated for here rather than by every caller, so a block placed
+        at a column's left edge starts at that edge instead of `padding` pixels inside it.
+        """
+        left = int(round(x)) - self.padding
+        top = int(round(y)) - self.padding
+        canvas.alpha_composite(self.image, (max(0, left), max(0, top)))
+        return self.translated(max(0, left), max(0, top))
 
 
 class TextBlockRenderer:
@@ -103,17 +123,15 @@ class TextBlockRenderer:
         """Draw `text` and return it together with its per-word annotation."""
         style = style or TextStyle()
         rng = rng or random.Random()
-        metrics = FontMetrics(font, self.shaper)
+        metrics = metrics_for(font, self.shaper)
         base_direction = direction or detect_direction(text)
 
         line_texts = list(wrap_text(text.split("\n"), metrics.advance, max_width))
         line_height = metrics.line_height(style.line_spacing)
         line_texts, dropped = fit_lines(line_texts, line_height, max_height)
-        while line_texts and not line_texts[-1].strip():
-            line_texts.pop()  # never end a block on a paragraph separator
 
         if not line_texts:
-            return RenderedText(Image.new("RGBA", (1, 1), (0, 0, 0, 0)), (), dropped)
+            return RenderedText(Image.new("RGBA", (1, 1), (0, 0, 0, 0)), (), dropped, _BLEED)
 
         plans = [self._plan_line(text_line, metrics, style, base_direction, rng) for text_line in line_texts]
         content_width = max((plan.width for plan in plans), default=0.0)
@@ -136,7 +154,7 @@ class TextBlockRenderer:
             lines.append(self._draw_line(draw, plan, metrics, style, origin_x, origin_y, base_direction))
 
         image = self._apply_synthetic_italic(image, style)
-        return RenderedText(image, tuple(lines), dropped)
+        return RenderedText(image, tuple(lines), dropped, _BLEED)
 
     # -- line planning -----------------------------------------------------
 

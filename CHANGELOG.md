@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.core.documents`: a document engine that produces full pages, not single lines.
+  - `DocumentBuilder` / `DocumentContent` separate *what a document says* from *how it
+    looks*, so the same content laid out in one column or two yields identical markup
+    ground truth.
+  - `PageSpec.from_paper` derives the canvas from paper size and DPI, with margins,
+    multi-column layout (right-first for RTL) and reserved header/footer bands.
+  - `DocumentRenderer` pours blocks down columns and onto further pages, splitting prose
+    and moving structure whole. Nothing is clipped, nothing overlaps, and pages can be
+    streamed one at a time.
+  - `TableRenderer` emits per-cell boxes, content-derived column widths, in-cell wrapping,
+    RTL column mirroring, and five border styles.
+  - `TypographySampler` samples one coherent font family per document with per-role sizes
+    and spacing, rather than a random face per block.
+  - Six document genres (article, report, newspaper, letter, form, invoice) behind a
+    weighted `TemplateRegistry`.
 - `ocrsmith.core.rendering`: a text renderer that emits pixels and their annotation in
   the same pass, so the two cannot disagree.
   - Words are drawn individually, which yields exact per-word boxes and is typographically

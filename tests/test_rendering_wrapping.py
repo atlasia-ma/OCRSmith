@@ -65,13 +65,16 @@ class TestBreakLongWord:
 
 
 class TestWrapText:
-    def test_paragraphs_are_separated_by_a_blank_line(self):
-        lines = list(wrap_text(["aa", "bb"], measure, 100))
+    def test_source_lines_are_flattened_without_blank_separators(self):
+        # The count of returned lines must equal the count of lines drawn, so vertical
+        # gaps are left to the layout engine rather than smuggled in as empty strings.
+        assert list(wrap_text(["aa", "bb"], measure, 100)) == ["aa", "bb"]
 
-        assert lines == ["aa", "", "bb"]
+    def test_blank_source_lines_contribute_nothing(self):
+        assert list(wrap_text(["aa", "   ", "bb"], measure, 100)) == ["aa", "bb"]
 
-    def test_single_paragraph_has_no_leading_separator(self):
-        assert list(wrap_text(["aa"], measure, 100)) == ["aa"]
+    def test_each_source_line_wraps_independently(self):
+        assert list(wrap_text(["aaa bbb", "cc"], measure, 40)) == ["aaa", "bbb", "cc"]
 
 
 class TestFitLines:

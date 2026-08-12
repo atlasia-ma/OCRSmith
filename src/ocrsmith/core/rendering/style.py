@@ -37,8 +37,10 @@ class TextStyle:
     stroke_width: int = 0
     stroke_color: tuple[int, int, int] = (0, 0, 0)
     align: Alignment = Alignment.NATURAL
-    #: Multiplier on the font's natural line height.
-    line_spacing: float = 1.2
+    #: Multiplier on the font's natural (ascender-to-descender) line height. 1.0 is the
+    #: tightest spacing that cannot clip. Arabic faces carry large vertical metrics, so
+    #: values above ~1.2 already read as double-spaced.
+    line_spacing: float = 1.0
     #: Multiplier on the width of a space between words.
     word_spacing: float = 1.0
     #: Maximum vertical wobble applied per line, in pixels.
