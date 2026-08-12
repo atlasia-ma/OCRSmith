@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from enum import Enum
 
-__all__ = ["Direction", "Script", "detect_direction", "detect_script", "is_arabic_char"]
+__all__ = [
+    "Direction",
+    "Script",
+    "detect_direction",
+    "detect_script",
+    "is_arabic_char",
+    "strong_direction",
+]
 
 # Arabic (0600-06FF), Arabic Supplement (0750-077F), Extended-A (08A0-08FF),
 # Presentation Forms-A (FB50-FDFF) and Forms-B (FE70-FEFF).
@@ -87,11 +94,11 @@ def detect_script(text: str) -> Script:
     return Script.NEUTRAL
 
 
-def detect_direction(text: str) -> Direction:
-    """Base direction from the first strong character, as the Unicode bidi algorithm does.
+def strong_direction(text: str) -> Direction | None:
+    """Direction of the first strong character, or None if `text` has none.
 
-    Neutral leading characters (digits, punctuation, whitespace) are skipped, so
-    ``"2024 مرحبا"`` is right-to-left while ``"2024"`` alone falls back to left-to-right.
+    Digits, punctuation and whitespace are *neutral*: they take their direction from
+    their surroundings rather than imposing one, so they are skipped here.
     """
     for char in text:
         code_point = ord(char)
@@ -99,4 +106,13 @@ def detect_direction(text: str) -> Direction:
             return Direction.RTL
         if _in_ranges(code_point, _LATIN_RANGES):
             return Direction.LTR
-    return Direction.LTR
+    return None
+
+
+def detect_direction(text: str) -> Direction:
+    """Base direction from the first strong character, as the Unicode bidi algorithm does.
+
+    Neutral leading characters are skipped, so ``"2024 مرحبا"`` is right-to-left while
+    ``"2024"`` alone falls back to left-to-right.
+    """
+    return strong_direction(text) or Direction.LTR
