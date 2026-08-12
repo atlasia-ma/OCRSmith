@@ -1,7 +1,8 @@
-from .BaseTextRenderingStrategy import BaseTextRenderingStrategy
 from PIL import ImageDraw
 from PIL.ImageFont import FreeTypeFont
+
 from ...FontManager import FontManager
+from .BaseTextRenderingStrategy import BaseTextRenderingStrategy
 
 
 class SimpleTextRenderingStrategy(BaseTextRenderingStrategy):
@@ -10,7 +11,7 @@ class SimpleTextRenderingStrategy(BaseTextRenderingStrategy):
 
     def render_text(self, font: FreeTypeFont, text: str, text_color: str = "#000000", **kwargs) -> tuple:
         padding = font.size
-        lines = text.split('\n')
+        lines = text.split("\n")
         text_height = FontManager.get_text_height(font, text)
         text_width = max(FontManager.get_text_width(font, line) for line in lines) if lines else 0
         width = text_width + padding
@@ -35,4 +36,3 @@ class SimpleTextRenderingStrategy(BaseTextRenderingStrategy):
             width, height = img.size
 
         return img, mask, (width, height)
-
