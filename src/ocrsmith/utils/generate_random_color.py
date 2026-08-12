@@ -1,10 +1,11 @@
 # src/ocrsmith/utils/generate_random_color.py
 
-from typing import Tuple
-from PIL import ImageColor
 import random as rnd
 
-def generate_random_color(color_range: str) -> Tuple[int, int, int]:
+from PIL import ImageColor
+
+
+def generate_random_color(color_range: str) -> tuple[int, int, int]:
     colors = [ImageColor.getrgb(c) for c in color_range.split(",")]
     c1, c2 = colors[0], colors[-1]
     return (
@@ -12,4 +13,3 @@ def generate_random_color(color_range: str) -> Tuple[int, int, int]:
         rnd.randint(min(c1[1], c2[1]), max(c1[1], c2[1])),
         rnd.randint(min(c1[2], c2[2]), max(c1[2], c2[2])),
     )
-    

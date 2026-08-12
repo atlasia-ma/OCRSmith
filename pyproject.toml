@@ -111,4 +111,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Re-exporting is what an __init__.py is for; the packages that care declare __all__.
+"__init__.py" = ["F401"]
 "tests/*" = ["B011"]
