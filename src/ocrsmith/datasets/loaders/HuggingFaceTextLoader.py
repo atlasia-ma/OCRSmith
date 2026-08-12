@@ -88,9 +88,7 @@ class HuggingFaceTextLoader(BaseTextDataLoader):
         if not isinstance(columns, (list, tuple)):
             return  # duck-typed source: validated per record instead
         if self.text_column not in columns:
-            raise ValueError(
-                f"Column '{self.text_column}' not found. Available columns: {list(columns)}"
-            )
+            raise ValueError(f"Column '{self.text_column}' not found. Available columns: {list(columns)}")
         if self.title_column and self.title_column not in columns:
             self.title_column = None
 

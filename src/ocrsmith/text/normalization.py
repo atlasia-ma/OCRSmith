@@ -24,17 +24,7 @@ __all__ = [
 TATWEEL = "ـ"
 
 # Tashkeel, Quranic annotation marks and the superscript alef.
-_DIACRITICS = re.compile(
-    "["
-    "ؐ-ؚ"
-    "ً-ٟ"
-    "ٰ"
-    "ۖ-ۜ"
-    "۟-ۨ"
-    "۪-ۭ"
-    "࣓-ࣿ"
-    "]"
-)
+_DIACRITICS = re.compile("[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۨ-ۭ࣓-ࣿ]")
 
 _ALEF_VARIANTS = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا"})
 _YA_VARIANTS = str.maketrans({"ى": "ي"})

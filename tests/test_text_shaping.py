@@ -5,6 +5,8 @@ The label a model is trained on is *logical* order; the pixels on the page are
 distinction is modelled explicitly and asserted here.
 """
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from ocrsmith.text import (
@@ -106,7 +108,7 @@ class TestShapedText:
     def test_is_immutable(self):
         shaped = ShapedText(logical="a", visual="a", direction=Direction.LTR)
 
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             shaped.visual = "b"
 
     def test_reports_whether_reshaping_happened(self):
