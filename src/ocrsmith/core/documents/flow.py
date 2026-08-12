@@ -107,23 +107,34 @@ class DocumentRenderer:
 
         page_number = 0
         while pending and page_number < max_pages:
-            page_number += 1
             image = self._new_canvas(spec, background)
             regions: list[Region] = []
+            furniture = 0
 
             if header is not None and spec.header_height:
                 regions.extend(self._draw_band(image, header, spec.header_box, typography, direction, rng))
             if footer_template and spec.footer_height:
                 block = ContentBlock(
                     RegionType.PAGE_NUMBER,
-                    text=str(footer_template).replace("{page}", str(page_number)),
+                    text=str(footer_template).replace("{page}", str(page_number + 1)),
                 )
                 regions.extend(self._draw_band(image, block, spec.footer_box, typography, direction, rng))
+            furniture = len(regions)
 
             pending = self._fill_columns(
                 image, pending, spec, typography, direction, regions, table_style, rng
             )
 
+            if len(regions) == furniture:
+                # Nothing could be placed anywhere on this page, so the leading block does
+                # not fit *any* column of this page shape. Emitting the page would produce
+                # a blank image with a confident label, and keeping the block would loop
+                # until max_pages; dropping it is the only honest option.
+                if pending:
+                    pending.pop(0)
+                continue
+
+            page_number += 1
             page = Page(spec.width, spec.height, tuple(regions), direction).clipped()
             yield RenderedPage(image, page, page_number)
 

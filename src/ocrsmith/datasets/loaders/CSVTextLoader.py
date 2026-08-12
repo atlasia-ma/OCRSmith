@@ -48,7 +48,9 @@ class CSVTextLoader(BaseTextDataLoader):
 
             if self.title_column:
                 chunk = chunk.dropna(subset=[self.text_column])
-                for txt, title in zip(chunk[self.text_column], chunk[self.title_column].fillna(""), strict=False):
+                for txt, title in zip(
+                    chunk[self.text_column], chunk[self.title_column].fillna(""), strict=False
+                ):
                     yield {"content": str(txt), "title": str(title)}
             else:
                 for txt in chunk[self.text_column].dropna().astype(str).tolist():

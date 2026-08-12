@@ -14,6 +14,11 @@ from .annotations import (
     TableCell,
     Word,
     assign_reading_order,
+    line_from_dict,
+    page_from_dict,
+    region_from_dict,
+    table_from_dict,
+    word_from_dict,
 )
 from .geometry import BBox, Point, Polygon
 from .sample import Provenance, Sample
@@ -32,4 +37,9 @@ __all__ = [
     "TableCell",
     "Word",
     "assign_reading_order",
+    "line_from_dict",
+    "page_from_dict",
+    "region_from_dict",
+    "table_from_dict",
+    "word_from_dict",
 ]

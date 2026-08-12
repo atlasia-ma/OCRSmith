@@ -8,6 +8,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.quality`: validation and statistics.
+  - Six validators for the failures that do not raise — blank pages, washed-out text,
+    boxes off the canvas, overlapping blocks, illegibly small lines, empty labels. Each
+    explains itself, so a rejection rate is diagnosable rather than merely alarming.
+  - The generation pipeline runs them as a gate; a shard that rejects more than
+    `quality.max_rejection_rate` aborts, because that is a configuration problem and a
+    shard full of holes would hide it behind a plausible-looking dataset.
+  - `DatasetStats` accumulates the distributions that define a corpus — templates, capture
+    conditions, direction, region types, alphabet, line-height percentiles — in constant
+    memory, and renders a dataset-card fragment.
+- `ocrsmith.evaluation`: CER, WER, normalised edit similarity, TEDS-style table similarity
+  and IoU-thresholded detection P/R/F1, plus a harness that scores a model's predictions
+  against a generated benchmark. Diacritic sensitivity is an explicit argument rather than
+  a silent convention.
+- `ocrsmith.domain.page_from_dict` and friends: annotations round-trip, so validation,
+  statistics and evaluation all read the same records the writers produce.
+- CLI: `validate`, `stats` and `evaluate`.
 - `ocrsmith.pipeline`: streaming generation.
   - `SampleFactory.create(index)` derives a per-sample seed from `(config.seed, index)`
     and yields one annotated `Sample` per page. Any sample can be regenerated on its own,

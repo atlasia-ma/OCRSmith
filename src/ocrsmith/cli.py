@@ -173,6 +173,111 @@ def doctor(config: Path = _CONFIG_OPTION) -> None:
         raise typer.Exit(code=1)
 
 
+@app.command()
+def validate(
+    dataset: Path = typer.Argument(..., help="A generated dataset directory."),
+    limit: int = typer.Option(0, "--limit", "-n", help="Stop after this many pages (0 = all)."),
+) -> None:
+    """Re-check a generated dataset's annotations against its images."""
+    from PIL import Image
+
+    from .domain import Sample, page_from_dict
+    from .quality import default_validators
+
+    pipeline = default_validators()
+    failures: dict[str, int] = {}
+    checked = 0
+
+    for path in sorted(dataset.glob("annotations-*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            image_path = dataset / record["image_path"]
+            if not image_path.exists():
+                failures["MissingImage"] = failures.get("MissingImage", 0) + 1
+                continue
+            sample = Sample(record["id"], Image.open(image_path), page_from_dict(record["page"]))
+            report = pipeline.check(sample)
+            checked += 1
+            for verdict in report.failures:
+                failures[verdict.validator] = failures.get(verdict.validator, 0) + 1
+            if limit and checked >= limit:
+                break
+        if limit and checked >= limit:
+            break
+
+    table = Table(title=f"validated {checked} page(s)")
+    table.add_column("check")
+    table.add_column("failures", justify="right")
+    table.add_column("rate", justify="right")
+    if failures:
+        for name, count in sorted(failures.items(), key=lambda item: -item[1]):
+            table.add_row(name, str(count), f"{count / max(1, checked):.1%}")
+    else:
+        table.add_row("[green]all checks passed[/]", "0", "0.0%")
+    console.print(table)
+    if failures:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def stats(
+    dataset: Path = typer.Argument(..., help="A generated dataset directory."),
+    markdown: Path = typer.Option(None, "--markdown", "-m", help="Write a dataset-card fragment here."),
+) -> None:
+    """Summarise what a generated dataset actually contains."""
+    from .quality import scan_jsonl
+
+    summary = scan_jsonl(dataset)
+    if summary.pages == 0:
+        console.print(f"[red]No annotation shards found in[/] {dataset}")
+        raise typer.Exit(code=1)
+    console.print_json(json.dumps(summary.to_dict(), ensure_ascii=False))
+    if markdown:
+        markdown.write_text(summary.to_markdown(), encoding="utf-8")
+        console.print(f"[green]Wrote dataset card fragment to[/] {markdown}")
+
+
+@app.command()
+def evaluate(
+    dataset: Path = typer.Argument(..., help="The benchmark dataset directory."),
+    predictions: Path = typer.Argument(..., help="JSON or JSONL of {id: prediction}."),
+    target: str = typer.Option("text", "--target", help="Ground truth field: text, markdown or html."),
+    ignore_diacritics: bool = typer.Option(False, "--ignore-diacritics"),
+    worst: int = typer.Option(5, "--worst", help="Show this many worst-scoring samples."),
+) -> None:
+    """Score a model's predictions against a generated benchmark."""
+    from .evaluation import evaluate as run_evaluation
+    from .evaluation import load_references
+
+    references = load_references(dataset, target=target)
+    if not references:
+        console.print(f"[red]No annotations found in[/] {dataset}")
+        raise typer.Exit(code=1)
+
+    raw = predictions.read_text(encoding="utf-8")
+    if predictions.suffix == ".jsonl":
+        parsed = {}
+        for line in raw.splitlines():
+            if line.strip():
+                record = json.loads(line)
+                parsed[record["id"]] = record.get("prediction", record.get("text", ""))
+    else:
+        parsed = json.loads(raw)
+
+    report = run_evaluation(references, parsed, target=target, ignore_diacritics=ignore_diacritics)
+    console.print_json(json.dumps(report.to_dict(), ensure_ascii=False))
+    if worst:
+        table = Table(title=f"{worst} worst samples")
+        table.add_column("sample")
+        table.add_column("CER", justify="right")
+        table.add_column("WER", justify="right")
+        for score in report.worst(worst):
+            table.add_row(score.sample_id, f"{score.cer:.3f}", f"{score.wer:.3f}")
+        console.print(table)
+
+
 @app.command("show-config")
 def show_config(config: Path = _CONFIG_OPTION, set_: list[str] = _SET_OPTION) -> None:
     """Print the fully resolved configuration."""

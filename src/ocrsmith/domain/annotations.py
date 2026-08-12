@@ -32,6 +32,11 @@ __all__ = [
     "Table",
     "TableCell",
     "Word",
+    "line_from_dict",
+    "page_from_dict",
+    "region_from_dict",
+    "table_from_dict",
+    "word_from_dict",
 ]
 
 
@@ -477,4 +482,75 @@ def assign_reading_order(regions: Sequence[Region], direction: Direction) -> tup
             dict(region.attributes),
         )
         for index, region in enumerate(ordered)
+    )
+
+
+# -- deserialisation ------------------------------------------------------
+#
+# Annotations are read back far more often than they are written: validation, statistics,
+# evaluation and any downstream loader all start from a serialised record. Keeping the
+# decoder next to the encoder is what stops the two drifting apart.
+
+
+def word_from_dict(data: dict) -> Word:
+    polygon = data.get("polygon")
+    return Word(
+        text=data.get("text", ""),
+        bbox=BBox.from_tuple(data["bbox"]),
+        polygon=Polygon.from_flat(polygon) if polygon else None,
+    )
+
+
+def line_from_dict(data: dict) -> Line:
+    polygon = data.get("polygon")
+    return Line(
+        text=data.get("text", ""),
+        bbox=BBox.from_tuple(data["bbox"]),
+        words=tuple(word_from_dict(word) for word in data.get("words", ())),
+        direction=Direction(data.get("direction", "ltr")),
+        baseline=data.get("baseline"),
+        polygon=Polygon.from_flat(polygon) if polygon else None,
+    )
+
+
+def table_from_dict(data: dict) -> Table:
+    return Table(
+        rows=data["rows"],
+        cols=data["cols"],
+        cells=tuple(
+            TableCell(
+                row=cell["row"],
+                col=cell["col"],
+                text=cell.get("text", ""),
+                bbox=BBox.from_tuple(cell["bbox"]) if cell.get("bbox") else None,
+                row_span=cell.get("row_span", 1),
+                col_span=cell.get("col_span", 1),
+                is_header=cell.get("is_header", False),
+            )
+            for cell in data.get("cells", ())
+        ),
+        has_header_row=data.get("has_header_row", False),
+    )
+
+
+def region_from_dict(data: dict) -> Region:
+    table = data.get("table")
+    return Region(
+        type=RegionType(data.get("type", "paragraph")),
+        bbox=BBox.from_tuple(data["bbox"]),
+        lines=tuple(line_from_dict(line) for line in data.get("lines", ())),
+        table=table_from_dict(table) if table else None,
+        reading_order=data.get("reading_order", 0),
+        attributes=dict(data.get("attributes", {})),
+    )
+
+
+def page_from_dict(data: dict) -> Page:
+    """Rebuild a `Page` from the dict produced by `Page.to_dict`."""
+    return Page(
+        width=data["width"],
+        height=data["height"],
+        regions=tuple(region_from_dict(region) for region in data.get("regions", ())),
+        direction=Direction(data.get("direction", "ltr")),
+        attributes=dict(data.get("attributes", {})),
     )
