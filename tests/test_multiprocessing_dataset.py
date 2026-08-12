@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from ocrsmith.config.schema import AppConfig
-from ocrsmith.core.OCRSmithEngine import OCRSmithEngine
+from ocrsmith.core.engine import OCRSmithEngine
 
 
 @pytest.fixture
