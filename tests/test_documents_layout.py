@@ -253,15 +253,27 @@ class TestFlowLayout:
         # Bullet markers and page furniture can add tokens; nothing may go missing.
         assert rendered_words >= expected
 
-    def test_two_columns_hold_more_per_page_than_one(self, renderer, typography, rng, latin_source):
+    def test_columns_are_narrower_and_both_get_used(self, renderer, typography, rng, latin_source):
+        # Not "two columns need fewer pages": narrower columns wrap more, and with orphan
+        # control a two-column layout can legitimately need one page more. What the
+        # feature actually guarantees is that blocks are confined to a column and that a
+        # page with enough content uses both of them.
         content = ArticleTemplate(min_sections=5, max_sections=5).build(latin_source, rng)
-        one = PageSpec.from_paper("a5", dpi=100, columns=1)
-        two = PageSpec.from_paper("a5", dpi=100, columns=2)
+        spec = PageSpec.from_paper("a5", dpi=100, columns=2)
 
-        single = renderer.render(content, one, typography, rng=random.Random(1), max_pages=40)
-        double = renderer.render(content, two, typography, rng=random.Random(1), max_pages=40)
+        pages = renderer.render(content, spec, typography, rng=random.Random(1), max_pages=40)
 
-        assert len(double) <= len(single)
+        column_width = spec.column_width
+        midpoint = spec.content_box.x0 + spec.content_box.width / 2
+        used_left = used_right = False
+        for page in pages:
+            for region in page.page.regions:
+                assert region.bbox.width <= column_width + 2
+                if region.bbox.center[0] < midpoint:
+                    used_left = True
+                else:
+                    used_right = True
+        assert used_left and used_right
 
     def test_right_to_left_documents_fill_the_right_column_first(
         self, renderer, typography, rng, arabic_source
