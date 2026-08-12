@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.core.degradations`: capture-condition modelling, where every degradation takes
+  the annotation as well as the image and returns both.
+  - Geometric: `Rotation` and `PerspectiveWarp` derive an explicit forward point mapping
+    and push the whole annotation through it, so boxes track the ink instead of drifting
+    silently. Rotated words gain polygons.
+  - Photometric: gaussian noise, paper grain, defocus and motion blur, brightness,
+    contrast, JPEG artefacts, downscaling, ink spread/erosion, bleed-through, shadow,
+    vignette, glare, stains and folds.
+  - Five presets — `clean`, `scan`, `photo`, `fax`, `archive` — ordered along the physical
+    capture chain, so a corpus can be composed by capture condition rather than by
+    undifferentiated noise.
 - `ocrsmith.core.documents`: a document engine that produces full pages, not single lines.
   - `DocumentBuilder` / `DocumentContent` separate *what a document says* from *how it
     looks*, so the same content laid out in one column or two yields identical markup
