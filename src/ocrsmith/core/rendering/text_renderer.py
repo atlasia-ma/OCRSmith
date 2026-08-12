@@ -126,7 +126,7 @@ class TextBlockRenderer:
         metrics = metrics_for(font, self.shaper)
         base_direction = direction or detect_direction(text)
 
-        line_texts = list(wrap_text(text.split("\n"), metrics.advance, max_width))
+        line_texts = list(wrap_text(text.split("\n"), metrics.line_advance, max_width))
         line_height = metrics.line_height(style.line_spacing)
         line_texts, dropped = fit_lines(line_texts, line_height, max_height)
 

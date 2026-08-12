@@ -236,3 +236,40 @@ class TestTranslation:
         original = rendered.lines[0].words[0].bbox
         assert moved[0].words[0].bbox.x0 == original.x0 + 100
         assert moved[0].words[0].bbox.y0 == original.y0 + 50
+
+
+class TestLineMeasurement:
+    """Wrapping must measure a line the way the renderer draws it.
+
+    The renderer places words individually and adds a space advance between them. If
+    wrapping measured the line as one shaped run instead, the two could disagree about
+    where a line ends — and the disagreement would show up as text overflowing its column.
+    """
+
+    def test_line_advance_is_the_sum_of_word_advances_and_gaps(self, font):
+        from ocrsmith.core.rendering.metrics import metrics_for
+
+        metrics = metrics_for(font)
+        words = ["mad", "rasa", "kbira"]
+
+        expected = sum(metrics.advance(w) for w in words) + metrics.space_advance * 2
+
+        assert metrics.line_advance(" ".join(words)) == pytest.approx(expected)
+
+    def test_a_single_word_measures_as_itself(self, font):
+        from ocrsmith.core.rendering.metrics import metrics_for
+
+        metrics = metrics_for(font)
+
+        assert metrics.line_advance("مرحبا") == pytest.approx(metrics.advance("مرحبا"))
+
+    def test_empty_text_has_no_width(self, font):
+        from ocrsmith.core.rendering.metrics import metrics_for
+
+        assert metrics_for(font).line_advance("   ") == 0.0
+
+    def test_wrapped_lines_fit_the_column_they_were_measured_against(self, renderer, font):
+        rendered = renderer.render(ARABIC + " " + LATIN, font, max_width=240)
+
+        for line in rendered.lines:
+            assert line.bbox.width <= 240 + 8  # canvas bleed

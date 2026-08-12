@@ -133,3 +133,41 @@ class TestShaperResolution:
     def test_any_shaper_keeps_the_label_intact(self):
         for backend in ("raqm", "reshaper"):
             assert resolve_shaper(backend).shape(HELLO_AR).logical == HELLO_AR
+
+
+class TestShapingCache:
+    """Shaping is cached because arabic-reshaper is pathologically slow per call.
+
+    Caching a pure function is only safe if it really is pure, so these pin the
+    behaviour the cache must not change.
+    """
+
+    def test_repeated_shaping_is_stable(self):
+        shaper = ReshaperBidiShaper()
+
+        first = shaper.shape(HELLO_AR)
+        second = shaper.shape(HELLO_AR)
+
+        assert first == second
+
+    def test_the_cache_does_not_bleed_between_inputs(self):
+        shaper = ReshaperBidiShaper()
+
+        one = shaper.shape("مرحبا").visual
+        two = shaper.shape("بالعالم").visual
+
+        assert one != two
+        assert shaper.shape("مرحبا").visual == one
+
+    def test_lam_alef_still_forms_a_ligature(self):
+        # The reshaper's ligature table is what the cache-warming workaround touches, so
+        # a lost ligature is the failure mode to watch for.
+        shaped = ReshaperBidiShaper().shape("لا")
+
+        assert len(shaped.visual) == 1
+        assert shaped.logical == "لا"
+
+    def test_a_shaped_word_keeps_its_character_count_otherwise(self):
+        shaped = ReshaperBidiShaper().shape("بالعالم")
+
+        assert len(shaped.visual) == len("بالعالم")

@@ -284,7 +284,7 @@ class DocumentRenderer:
         lines = [
             wrapped
             for source in text.split("\n")
-            for wrapped in wrap_paragraph(source, metrics.advance, column.width)
+            for wrapped in wrap_paragraph(source, metrics.line_advance, column.width)
         ]
         if not lines:
             return (None, role.space_after, None)

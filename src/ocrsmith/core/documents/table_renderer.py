@@ -121,7 +121,7 @@ class TableRenderer:
         for cell in table.cells:
             if cell.col_span > 1:
                 continue  # spanning cells do not constrain a single column
-            natural[cell.col] = max(natural[cell.col], metrics.advance(cell.text) + padding)
+            natural[cell.col] = max(natural[cell.col], metrics.line_advance(cell.text) + padding)
 
         total = sum(natural)
         if total <= max_width or total <= 0:
@@ -138,7 +138,7 @@ class TableRenderer:
         for cell in table.cells:
             span_width = sum(col_widths[cell.col : cell.col + cell.col_span])
             available = max(1.0, span_width - inner_padding)
-            wrapped[(cell.row, cell.col)] = wrap_paragraph(cell.text, metrics.advance, available)
+            wrapped[(cell.row, cell.col)] = wrap_paragraph(cell.text, metrics.line_advance, available)
         return wrapped
 
     def _row_heights(
