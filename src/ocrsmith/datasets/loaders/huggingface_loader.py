@@ -1,9 +1,9 @@
 # src/ocrsmith/datasets/loaders/HuggingFaceTextLoader.py
 
 from collections.abc import Iterator, Mapping
-from typing import Any, Optional
+from typing import Any
 
-from .BaseTextDataLoader import BaseTextDataLoader
+from .base import BaseTextDataLoader
 
 _AUTH_MARKERS = ("401", "403", "Unauthorized", "Permission", "Access")
 _AUTH_HINT = (
@@ -31,7 +31,7 @@ class HuggingFaceTextLoader(BaseTextDataLoader):
     in for a real ``Dataset`` in tests and in offline pipelines.
     """
 
-    def __init__(self, text_column: str = "text", title_column: Optional[str] = None):
+    def __init__(self, text_column: str = "text", title_column: str | None = None):
         super().__init__(text_column=text_column, title_column=title_column)
 
     def load_texts(self, dataset_name: str, split: str = "train", **kwargs) -> list:
