@@ -1,3 +1,3 @@
-from .AugmentationStrategy import AugmentationStrategy
 from .AugmentationContext import AugmentationContext
-from .strategies import NoiseAugmentation, BlurAugmentation, RotationAugmentation, BrightnessAugmentation
+from .AugmentationStrategy import AugmentationStrategy
+from .strategies import BlurAugmentation, BrightnessAugmentation, NoiseAugmentation, RotationAugmentation
