@@ -1,7 +1,6 @@
-from .augmentation import NoiseAugmentation
-from .AugmentationManager import AugmentationManager
-from .BackgroundManager import BackgroundManager
-from .engine import OCRSmithEngine
-from .FontManager import FontManager
-from .TextPlacementManager import TextPlacementManager
-from .TextRenderingManager import TextRenderingManager
+"""Rendering, layout and degradation subsystems."""
+
+from .backgrounds import BackgroundSampler
+from .fonts import FontPool, discover_fonts, load_font
+
+__all__ = ["BackgroundSampler", "FontPool", "discover_fonts", "load_font"]

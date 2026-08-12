@@ -1,0 +1,52 @@
+# A flatbed-scan corpus of Moroccan Darija documents.
+#
+# The shape most useful as a first training set: mostly single-column A4 at print
+# resolution, lightly degraded, with a share of clean pages for curriculum warm-up.
+
+seed: 20260812
+
+fonts:
+  paths: ["assets/fonts"]
+  size_range: [20, 32]
+  require_full_coverage: true
+
+text:
+  source:
+    type: huggingface
+    path: atlasia/Moroccan-Darija-Wiki-Dataset
+    column: content
+    title_column: title
+    limit: 50000
+  direction: rtl
+
+page:
+  papers: { a4: 5.0, a5: 1.0 }
+  dpi_range: [140, 200]
+  margin_mm_range: [15.0, 28.0]
+  columns: { 1: 4.0, 2: 1.0 }
+  header_probability: 0.3
+  footer_probability: 0.5
+  max_pages: 3
+
+templates:
+  weights:
+    article: 4.0
+    report: 2.0
+    letter: 1.0
+    newspaper: 1.0
+
+degradations:
+  presets:
+    clean: 2.0
+    scan: 6.0
+    archive: 1.0
+
+output:
+  dir: outputs/darija_scan
+  format: jsonl
+  image_format: png
+  shard_size: 1000
+
+run:
+  num_samples: 20000
+  workers: 8

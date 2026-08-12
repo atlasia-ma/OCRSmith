@@ -1,0 +1,240 @@
+"""Document templates.
+
+Each template describes one *genre* of document. Genre matters more than it looks: a model
+trained only on flowing articles never learns that a receipt has right-aligned amounts,
+that a form has label/value pairs, or that a newspaper's columns are read across a
+gutter. The registry lets a generation run sample genres by weight, so a corpus can be
+deliberately balanced instead of accidentally uniform.
+
+Templates produce content only. Page size, fonts and degradation are decided elsewhere,
+which is what lets the same article appear as a crisp A4 print and a creased phone photo
+with identical markup ground truth.
+"""
+
+from __future__ import annotations
+
+import random
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
+
+from .content import DocumentBuilder, DocumentContent
+from .text_source import TextProvider
+
+__all__ = [
+    "ArticleTemplate",
+    "DocumentTemplate",
+    "FormTemplate",
+    "InvoiceTemplate",
+    "LetterTemplate",
+    "NewspaperTemplate",
+    "ReportTemplate",
+    "TemplateRegistry",
+    "default_registry",
+]
+
+
+@runtime_checkable
+class DocumentTemplate(Protocol):
+    """Builds one document's content from a text source."""
+
+    name: str
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ArticleTemplate:
+    """Title, lead paragraph, then sections of prose — the commonest document shape."""
+
+    name: str = "article"
+    min_sections: int = 2
+    max_sections: int = 5
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        direction = options.get("direction")
+        builder = DocumentBuilder(direction, template=self.name)
+        builder.title(source.title(rng))
+        builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        for _ in range(rng.randint(self.min_sections, self.max_sections)):
+            builder.heading(source.title(rng))
+            for _ in range(rng.randint(1, 3)):
+                builder.paragraph(source.paragraph(rng, rng.randint(2, 5)))
+            if rng.random() < 0.25:
+                builder.list([source.phrase(rng, 6) for _ in range(rng.randint(2, 5))])
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class ReportTemplate:
+    """Headed report with a data table, a figure and a caption."""
+
+    name: str = "report"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.header(source.phrase(rng, 4))
+        builder.title(source.title(rng))
+        builder.paragraph(source.paragraph(rng, 3))
+        builder.heading(source.title(rng))
+        builder.table(_sample_table(source, rng))
+        builder.caption(source.phrase(rng, 6))
+        builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        if rng.random() < 0.5:
+            builder.figure(width=rng.randint(240, 420), height=rng.randint(160, 300))
+            builder.caption(source.phrase(rng, 5))
+        builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class LetterTemplate:
+    """Correspondence: addressee, body, sign-off."""
+
+    name: str = "letter"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.paragraph(source.phrase(rng, 5))
+        builder.separator()
+        builder.paragraph(source.phrase(rng, 4))
+        for _ in range(rng.randint(2, 4)):
+            builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        builder.paragraph(source.phrase(rng, 3))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class FormTemplate:
+    """Label/value rows, the shape used by administrative forms and IDs."""
+
+    name: str = "form"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.title(rng))
+        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 3)) for _ in range(rng.randint(4, 9))])
+        builder.separator()
+        builder.heading(source.phrase(rng, 3))
+        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 2)) for _ in range(rng.randint(3, 6))])
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceTemplate:
+    """Header, line-item table with totals, then terms."""
+
+    name: str = "invoice"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.phrase(rng, 3))
+        builder.key_values(
+            [
+                (source.phrase(rng, 2), f"{rng.randint(1000, 99999)}"),
+                (source.phrase(rng, 2), f"{rng.randint(1, 28)}/{rng.randint(1, 12)}/2026"),
+            ]
+        )
+        rows = [
+            [
+                source.phrase(rng, 2),
+                source.phrase(rng, 3),
+                str(rng.randint(1, 20)),
+                f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
+            ]
+        ]
+        for _ in range(rng.randint(3, 8)):
+            rows.append(
+                [
+                    source.phrase(rng, 2),
+                    source.phrase(rng, 4),
+                    str(rng.randint(1, 20)),
+                    f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
+                ]
+            )
+        builder.table(rows)
+        builder.key_values([(source.phrase(rng, 1), f"{rng.randint(100, 99999)}.00")])
+        builder.paragraph(source.paragraph(rng, 2))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class NewspaperTemplate:
+    """Dense multi-column prose with a masthead and short headlines."""
+
+    name: str = "newspaper"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.header(source.phrase(rng, 3))
+        builder.title(source.title(rng))
+        for index in range(rng.randint(3, 6)):
+            if index:
+                builder.heading(source.title(rng), level=3)
+            for _ in range(rng.randint(2, 4)):
+                builder.paragraph(source.paragraph(rng, rng.randint(3, 6)))
+        return builder.build()
+
+
+def _sample_table(source: TextProvider, rng: random.Random) -> list[list[str]]:
+    cols = rng.randint(2, 5)
+    rows = rng.randint(3, 7)
+    header = [source.phrase(rng, 2) for _ in range(cols)]
+    body = [
+        [source.phrase(rng, 2) if col == 0 else str(rng.randint(0, 9999)) for col in range(cols)]
+        for _ in range(rows)
+    ]
+    return [header, *body]
+
+
+class TemplateRegistry:
+    """Named templates with sampling weights."""
+
+    def __init__(self):
+        self._templates: dict[str, DocumentTemplate] = {}
+        self._weights: dict[str, float] = {}
+
+    def register(self, template: DocumentTemplate, weight: float = 1.0) -> TemplateRegistry:
+        self._templates[template.name] = template
+        self._weights[template.name] = max(0.0, weight)
+        return self
+
+    def get(self, name: str) -> DocumentTemplate:
+        try:
+            return self._templates[name]
+        except KeyError:
+            raise ValueError(
+                f"Unknown template {name!r}. Available: {', '.join(sorted(self._templates))}"
+            ) from None
+
+    def sample(self, rng: random.Random, names: list[str] | None = None) -> DocumentTemplate:
+        candidates = names or list(self._templates)
+        weights = [self._weights.get(name, 1.0) for name in candidates]
+        if not candidates or sum(weights) <= 0:
+            raise ValueError("No templates available to sample from")
+        return self._templates[rng.choices(candidates, weights=weights, k=1)[0]]
+
+    def names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._templates))
+
+    def __len__(self) -> int:
+        return len(self._templates)
+
+    def __iter__(self) -> Iterator[DocumentTemplate]:
+        return iter(self._templates.values())
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._templates
+
+
+def default_registry() -> TemplateRegistry:
+    """The built-in genres, weighted towards the shapes that dominate real corpora."""
+    return (
+        TemplateRegistry()
+        .register(ArticleTemplate(), weight=3.0)
+        .register(ReportTemplate(), weight=2.0)
+        .register(NewspaperTemplate(), weight=1.5)
+        .register(LetterTemplate(), weight=1.0)
+        .register(FormTemplate(), weight=1.0)
+        .register(InvoiceTemplate(), weight=1.0)
+    )

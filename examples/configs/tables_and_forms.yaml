@@ -1,0 +1,45 @@
+# Structure-heavy pages for table recognition and key-value extraction.
+#
+# Tables serialise to HTML (TEDS-scored) and OTSL (table-structure transformers); form
+# rows carry their key and value in the region attributes.
+
+seed: 77
+
+fonts:
+  paths: ["assets/fonts"]
+  size_range: [18, 26]
+
+text:
+  source:
+    type: inline
+    sentences:
+      - "المؤشر السنوي للمبيعات حسب المنطقة والفترة الزمنية."
+      - "رقم الفاتورة والتاريخ ومجموع المبالغ المستحقة."
+      - "اسم العميل والعنوان ورقم الهاتف والبريد الإلكتروني."
+      - "الكمية وسعر الوحدة والمجموع الفرعي والضريبة المضافة."
+  direction: rtl
+
+page:
+  papers: { a4: 3.0, receipt: 2.0, letter: 1.0 }
+  dpi_range: [150, 220]
+  columns: { 1: 1.0 }
+  footer_probability: 0.6
+  max_pages: 2
+
+templates:
+  weights:
+    invoice: 3.0
+    form: 3.0
+    report: 2.0
+
+degradations:
+  presets: { clean: 1.0, scan: 3.0, photo: 1.0 }
+
+output:
+  dir: outputs/tables_and_forms
+  format: jsonl
+  shard_size: 500
+
+run:
+  num_samples: 5000
+  workers: 4

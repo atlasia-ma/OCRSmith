@@ -1,0 +1,56 @@
+# Documents photographed with a phone: the hard case, and the one real users produce.
+#
+# Perspective, uneven light and heavy compression, at the low effective resolution that
+# destroys Arabic diacritics. WebDataset output because a corpus this size does not want
+# a million loose files.
+
+seed: 4242
+
+fonts:
+  paths: ["assets/fonts"]
+  size_range: [24, 40]        # larger type survives the downscaling
+
+text:
+  source:
+    type: huggingface
+    path: atlasia/Moroccan-Darija-Wiki-Dataset
+    column: content
+    limit: 100000
+  direction: rtl
+
+page:
+  papers: { a4: 3.0, a5: 2.0, receipt: 1.0 }
+  dpi_range: [110, 160]
+  columns: { 1: 4.0, 2: 1.0 }
+  landscape_probability: 0.1
+  max_pages: 2
+  background:
+    kinds: { paper: 4.0, solid: 1.0 }
+
+templates:
+  weights:
+    article: 2.0
+    report: 2.0
+    invoice: 2.0
+    form: 2.0
+    letter: 1.0
+
+degradations:
+  presets: { photo: 1.0 }
+
+quality:
+  enabled: true
+  # Aggressive degradation legitimately loses some pages; allow a higher rejection rate
+  # than the default before treating it as a configuration error.
+  max_rejection_rate: 0.65
+
+output:
+  dir: outputs/phone_photos
+  format: webdataset
+  image_format: jpeg
+  image_quality: 85
+  shard_size: 2000
+
+run:
+  num_samples: 100000
+  workers: 16

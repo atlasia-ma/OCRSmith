@@ -1,137 +1,104 @@
-# config.yaml - Fixed to match your actual strategy types
+# OCRSmith default corpus specification.
+#
+# Everything that varies per sample is a distribution, not a value: a corpus is defined by
+# its distributions, and pinning one narrows the dataset in a way that is invisible until
+# a model fails on whatever was left out.
+
+seed: 1234
+
 fonts:
-  - path: assets/fonts/Amiri-Bold.ttf
-  - path: assets/fonts/Vazirmatn-ExtraBold.ttf
-  - path: assets/fonts/Mada-Bold.ttf
-  - path: assets/fonts/Amiri-Bold.ttf
-  - path: assets/fonts/NotoSansArabic_Condensed-Bold.ttf
-  - path: assets/fonts/NotoSansArabic_ExtraCondensed-ExtraBold.ttf
-  - path: assets/fonts/NotoNaskhArabic-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic-ExtraBold.ttf
-  - path: assets/fonts/Mada-SemiBold.ttf
-  - path: assets/fonts/Fustat-ExtraBold.ttf
-  - path: assets/fonts/NotoKufiArabic-ExtraBold.ttf
-  - path: assets/fonts/NotoSansArabic_Condensed-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic_ExtraCondensed-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic_Condensed-ExtraBold.ttf
-  - path: assets/fonts/Fustat-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic-Bold.ttf
-  - path: assets/fonts/NotoKufiArabic-SemiBold.ttf
-  - path: assets/fonts/Amiri-BoldItalic.ttf
-  - path: assets/fonts/Vazirmatn-Bold.ttf
-  - path: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic_SemiCondensed-Bold.ttf
-  - path: assets/fonts/NotoNaskhArabic-Bold.ttf
-  - path: assets/fonts/NotoKufiArabic-Bold.ttf
-  - path: assets/fonts/NotoSansArabic-SemiBold.ttf
-  - path: assets/fonts/NotoSansArabic_SemiCondensed-ExtraBold.ttf
-  - path: assets/fonts/Vazirmatn-SemiBold.ttf
-  - path: assets/fonts/IBMPlexSansArabic-Bold.ttf
-  - path: assets/fonts/NotoSansArabic_SemiCondensed-SemiBold.ttf
-  - path: assets/fonts/Fustat-Bold.ttf
-  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Bold.ttf
-  - path: assets/fonts/Vazirmatn-Medium.ttf
-  - path: assets/fonts/NotoSansArabic_Condensed-Medium.ttf
-  - path: assets/fonts/NotoSansArabic_SemiCondensed-Medium.ttf
-  - path: assets/fonts/Fustat-Medium.ttf
-  - path: assets/fonts/Mada-Medium.ttf
-  - path: assets/fonts/NotoSansArabic-Medium.ttf
-  - path: assets/fonts/NotoNaskhArabic-Medium.ttf
-  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Medium.ttf
-  - path: assets/fonts/IBMPlexSansArabic-Medium.ttf
-  - path: assets/fonts/NotoKufiArabic-Medium.ttf
-  - path: assets/fonts/NotoSansArabic_Condensed-Regular.ttf
-  - path: assets/fonts/Mada-Regular.ttf
-  - path: assets/fonts/NotoSansArabic_SemiCondensed-Regular.ttf
-  - path: assets/fonts/Fustat-Regular.ttf
-  - path: assets/fonts/NotoSansArabic-Regular.ttf
-  - path: assets/fonts/NotoNaskhArabic-Regular.ttf
-  - path: assets/fonts/Vazirmatn-Regular.ttf
-  - path: assets/fonts/IBMPlexSansArabic-Regular.ttf
-  - path: assets/fonts/NotoKufiArabic-Regular.ttf
-  - path: assets/fonts/Amiri-Regular.ttf
-  - path: assets/fonts/NotoSansArabic_ExtraCondensed-Regular.ttf
+  paths: ["assets/fonts"]
+  size_range: [18, 30]
+  # Reject a font that cannot draw a character rather than emitting a tofu box that
+  # contradicts the label.
+  require_full_coverage: true
 
-# text_data:
-#   source_type: 'csv'
-#   source_path: 'assets/text_data/sentences.csv'
-#   text_column: 'darija_ar'
+text:
+  source:
+    # Defaults to the built-in sentences so a fresh clone generates something immediately.
+    # Point this at a real corpus before generating anything you intend to train on -
+    # synthetic layout over six sentences teaches a vocabulary that does not exist.
+    # See examples/configs/darija_scan.yaml for a Hugging Face source.
+    type: inline
+    column: content
+    title_column: title
+    split: train
+    limit: 20000
+    sentences:
+      - "المغرب بلد يقع في شمال إفريقيا ويطل على المحيط الأطلسي والبحر الأبيض المتوسط."
+      - "تهدف أطلسيا إلى بناء نماذج ذكاء اصطناعي مفتوحة المصدر للغة الدارجة المغربية."
+      - "يحتوي هذا التقرير على جداول وأرقام ومعلومات إضافية مفيدة للقارئ المهتم."
+      - "في سنة 2024 أطلقت المجموعة نموذج OCR جديد يدعم اللغتين العربية والفرنسية."
+      - "تعتمد الطريقة المقترحة على توليد بيانات اصطناعية متنوعة وواقعية قدر الإمكان."
+  normalization:
+    # Each of these rewrites the ground truth, so all default to off.
+    strip_diacritics: false
+    strip_tatweel: false
+    unify_alef: false
+    unify_ya: false
+    numerals: keep
+    collapse_whitespace: true
+  direction: auto
 
+page:
+  papers:
+    a4: 4.0
+    a5: 1.0
+    letter: 1.0
+  dpi_range: [110, 200]
+  margin_mm_range: [12.0, 28.0]
+  columns:
+    1: 3.0
+    2: 1.0
+  landscape_probability: 0.05
+  header_probability: 0.35
+  footer_probability: 0.45
+  max_pages: 3
+  background:
+    kinds:
+      paper: 3.0
+      solid: 1.0
+      gradient: 0.3
+      image: 0.0
+    image_paths: []
+    tint_range: [[238, 234, 226], [255, 255, 255]]
 
-text_data:
-  source_type: 'huggingface'
-  source_path: 'atlasia/Moroccan-Darija-Wiki-Dataset'
-  text_column: 'content'
-  title_column: 'title'
+templates:
+  weights:
+    article: 3.0
+    report: 2.0
+    newspaper: 1.5
+    letter: 1.0
+    form: 1.0
+    invoice: 1.0
 
-backgrounds:
-  # Image Backgrounds
-  - type: image
-    image_path: "assets/backgrounds/white_paper.jpg"
-    mode: crop
-  - type: image
-    image_path: "assets/backgrounds/blue.jpg"
-    mode: crop
+degradations:
+  # Capture conditions, weighted so the corpus is balanced deliberately rather than
+  # accidentally. "clean" keeps a share of undegraded pages for curriculum training.
+  presets:
+    clean: 1.0
+    scan: 4.0
+    photo: 3.0
+    fax: 0.5
+    archive: 1.0
 
-    
-  # Solid Color Backgrounds
-  - type: solid
-    color: [255, 255, 255]  # White
-  - type: solid
-    color: [240, 240, 240]  # Light gray
-  - type: solid
-    color: [200, 220, 255]  # Light blue
-  - type: solid
-    color: [255, 248, 220]  # Cream
-    
-  # Gradient Backgrounds
-  - type: gradient
-    start_color: [224, 255, 255]  # Light Cyan Blue
-    end_color: [240, 255, 240]    # Light Mint Green
-    direction: vertical
-  - type: gradient
-    start_color: [224, 255, 255]  # Light Cyan Blue
-    end_color: [240, 255, 240]    # Light Mint Green
-    direction: diagonal
-  - type: gradient
-    start_color: [173, 216, 230]  # Pastel Blue
-    end_color: [152, 251, 152]    # Pale Seafoam Green
-    direction: horizontal
-    
-  # Texture Backgrounds
-  - type: texture
-    base_color: [240, 240, 240]
-    noise_level: 6
-  - type: texture
-    base_color: [255, 248, 220]
-    noise_level: 15
-  - type: texture
-    base_color: [230, 230, 255]
-    noise_level: 10
-
-text_renderers:
-  - type: horizontal
-    weight: 1.0
-
-text_placements:
-  - type: center
-  - type: random
-  # - type: page_number
-  # - type: page_title
-
-augmentations: []
-
-
-layout:
-  type: simple
-  padding: 50
-  max_width: 60
-  max_height: 300
+quality:
+  # Validate every page before it reaches the dataset. Synthetic data fails quietly:
+  # blank pages, washed-out text and boxes off the canvas do not raise, they just teach
+  # a model something false.
+  enabled: true
+  max_rejection_rate: 0.5
 
 output:
-  images_dir: outputs/images
-  metadata_file: outputs/metadata.jsonl
+  dir: outputs/dataset
+  format: jsonl
+  image_format: png
+  image_quality: 92
+  images_subdir: images
+  shard_size: 500
+  eval_fraction: 0.0
 
-dataset:
-  source: csv
-  path: data/input.csv
+run:
+  num_samples: 100
+  workers: 1
+  start_index: 0

@@ -1,392 +1,251 @@
+<div align="center">
+
 # OCRSmith
 
-**OCRSmith** is a powerful Python library for generating **synthetic OCR datasets** with comprehensive support for **Arabic and Latin text**. It provides a flexible, modular architecture for creating high-quality training data for OCR models from various text sources.
+**A synthetic document forge for training OCR and document-understanding models — Arabic first.**
+
+[![CI](https://github.com/atlasia-ma/OCRSmith/actions/workflows/ci.yml/badge.svg)](https://github.com/atlasia-ma/OCRSmith/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+</div>
 
 ---
 
-## 🚀 Features
+OCRSmith generates **whole documents**, not cropped text lines: multi-column pages with
+titles, tables, figures, forms and running headers, degraded to look like something a
+scanner or a phone actually produced — and it emits the ground truth for every objective
+those pages can supervise.
 
-### Core Functionality
+One rendered page gives you, from the same pass:
 
-- **Synthetic text image generation** with configurable fonts and backgrounds
-- **Multi-language support**: Arabic and Latin text rendering with proper font handling
-- **Flexible text placement strategies**: random, centered, grid-based, and contextual positioning
-- **Rich augmentation pipeline**: noise, blur, brightness, rotation, and custom effects
-- **Comprehensive background generation**: solid colors, gradients, noise patterns, and custom images
+| Objective | What you get |
+| --- | --- |
+| Recognition | Line and word crops with logical-order text |
+| Detection | Word, line and region boxes; polygons where the page is warped |
+| Layout analysis | Typed regions (`title`, `table`, `figure`, `key_value`, …) in reading order |
+| Document → markup | The page serialised back to **Markdown** and **HTML** |
+| Table structure | Cell grid as HTML *and* **OTSL** |
 
-### Text Placement & Layout
+Everything is reproducible from a seed, streamed rather than materialised, and validated
+before it reaches the dataset.
 
-- **Contextual placement strategies**:
-  - **Page titles**: Top-centered positioning with proper margins
-  - **Page numbers**: Bottom-right corner placement
-  - **Random placement**: Within configurable margins
-  - **Grid-based placement**: Structured positioning
-  - **Center placement**: Perfect centering on backgrounds
-- **Smart composition**: Each placement strategy handles image composition internally
-- **Rich metadata**: Detailed placement information for training optimization
+## Why another generator
 
-### Data Sources
+Most synthetic OCR data is a line of text on a noisy background. That teaches a model to
+read a crop; it does not teach it to read a page. And most generators built for Latin
+script get Arabic subtly wrong in ways that are invisible until training plateaus:
 
-- **Multiple input formats**:
-  - CSV files with configurable text columns
-  - Hugging Face datasets with automatic loading
-  - Parquet files for efficient data handling
-  - Direct text input
-- **Batch processing**: Generate thousands of samples efficiently
-- **Memory-optimized**: Iterator-based text loading for large datasets
+- **Logical vs visual order.** The label a model must predict is the *logical* string; the
+  pixels are in *visual* order. OCRSmith keeps them apart explicitly and never confuses
+  them — see [`ocrsmith/text/shaping.py`](src/ocrsmith/text/shaping.py).
+- **Missing glyphs.** A font that cannot draw a character renders a blank or a tofu box
+  while the label still claims it. OCRSmith checks the font's `cmap` before choosing it.
+- **Boxes that do not follow the pixels.** A rotation that moves ink but leaves the
+  annotation behind produces a dataset that looks fine and trains a detector to be
+  systematically wrong. Here every geometric degradation maps the annotation through the
+  same transform.
+- **Silent truncation.** A wrapper that drops the tail of a paragraph produces an image
+  whose label claims text that was never drawn. OCRSmith's wrapping is lossless, and text
+  that does not fit is *reported*, not discarded.
 
-### Augmentation System
-
-- **Pipeline-based augmentation**: Chain multiple effects with probability control
-- **Built-in augmentations**:
-  - Gaussian noise injection
-  - Blur effects
-  - Brightness adjustment
-  - Rotation transforms
-- **Extensible**: Easy to add custom augmentation strategies
-- **Configurable probabilities**: Fine-tune augmentation frequency
-
----
-
-## 🏗️ Architecture
-
-OCRSmith follows a modular, strategy-pattern architecture:
-
-```
-OCRSmith/
-├── core/
-│   ├── BackgroundManager.py       # Background generation orchestration
-│   ├── FontManager.py            # Font loading and caching
-│   ├── TextRenderer.py           # Text-to-image rendering
-│   ├── placement/                # Text placement strategies
-│   │   ├── RandomPlacement       # Random positioning
-│   │   ├── CenterPlacement       # Centered positioning
-│   │   ├── GridPlacement         # Grid-based positioning
-│   │   ├── PageTitlePlacement    # Title positioning
-│   │   └── PageNumberPlacement   # Page number positioning
-│   ├── backgrounds/              # Background generation
-│   │   ├── SolidColorBackground  # Solid color backgrounds
-│   │   ├── GradientBackground    # Gradient backgrounds
-│   │   ├── NoiseBackground       # Noise pattern backgrounds
-│   │   └── ImageBackground       # Custom image backgrounds
-│   ├── augmentation/             # Image augmentation pipeline
-│   │   ├── NoiseAugmentation     # Noise injection
-│   │   ├── BlurAugmentation      # Blur effects
-│   │   ├── BrightnessAugmentation # Brightness adjustment
-│   │   └── RotationAugmentation  # Rotation transforms
-│   └── fonts/                    # Font management system
-├── datasets/                     # Data loading utilities
-│   ├── CSVTextLoader            # CSV file support
-│   ├── ParquetTextLoader        # Parquet file support
-│   └── HuggingFaceTextLoader    # HuggingFace dataset support
-└── config/                      # Configuration management
-```
-
----
-
-## 📦 Installation
+## Install
 
 ```bash
-# Create and activate conda environment
-conda create -n ocrsmith python=3.10 -y
-conda activate ocrsmith
-
-# Clone the repository
-git clone https://github.com/yourusername/OCRSmith.git
-cd OCRSmith
-
-# Install in production mode
-pip install .
-
-# Install in development mode
-pip install -e .
-
+pip install -e ".[data,dev]"
 ```
 
----
+`data` adds pandas/pyarrow/`datasets` for tabular and Hugging Face corpora and for
+Parquet output; the core install stays light.
 
-## 🎯 Quick Start
+Check the machine can produce correct Arabic:
 
-### Basic Usage
+```bash
+ocrsmith doctor
+```
+
+Pillow built with Raqm delegates shaping to HarfBuzz; without it OCRSmith falls back to
+`arabic-reshaper` + `python-bidi`. Both paths produce the same labels.
+
+## Quick start
+
+```bash
+ocrsmith preview --count 3 --boxes --output outputs/preview
+```
+
+```bash
+ocrsmith generate --num-samples 10000 --workers 8 --format webdataset -o data/train
+```
+
+```bash
+ocrsmith stats data/train --markdown data/train/DATASET_CARD.md
+ocrsmith validate data/train
+```
+
+From Python:
 
 ```python
-from ocrsmith.core.BackgroundManager import BackgroundManager
-from ocrsmith.core.backgrounds.BackgroundFactory import BackgroundFactory
-from ocrsmith.core.backgrounds.creators import *
-from ocrsmith.config import load_config
-from ocrsmith.core.FontManager import FontManager
-from ocrsmith.core.TextRenderer import TextRenderer
-from ocrsmith.core.text_renderers.strategies.HorizontalRenderingStrategy import HorizontalRenderingStrategy
-from ocrsmith.core.placement import PlacementManager, RandomPlacementStrategy
+from ocrsmith import load_config, run_generation
 
-# Setup background factory
-factory = BackgroundFactory()
-factory.register_creator('solid', SolidColorBackground)
-factory.register_creator('gradient', GradientBackground)
-factory.register_creator('noise', NoiseBackground)
-factory.register_creator('image', ImageBackground)
-
-# Load configuration and initialize managers
-configs = load_config()
-background_manager = BackgroundManager(configs, factory)
-font_manager = FontManager(font_paths=["assets/fonts"], default_size=24)
-
-# Setup placement
-placement_manager = PlacementManager()
-placement_manager.register_strategy('random', RandomPlacementStrategy())
-
-# Generate text image
-font = font_manager.load_font(font_size=18)
-text = "Sample text for OCR training"
-text_renderer = TextRenderer(HorizontalRenderingStrategy())
-text_image, mask, (width, height) = text_renderer.generate_text_image(font, text)
-
-# Generate background
-background_creator = background_manager.get_random_background()
-background_image = background_creator.render(width + 100, height + 100)
-
-# Place text and get composed image
-placement_result = placement_manager.place_text(text_image, background_image, 'random')
-final_image = placement_result.composed_image
-
-# Save result
-final_image.save("output.png")
+config = load_config("configs/darija_scan.yaml")
+result = run_generation(config)
+print(result.to_dict())
 ```
 
-### CLI Usage (examples)
+Or drive the generator directly and keep the samples in memory:
 
-You can run the app directly with command-line overrides:
+```python
+from ocrsmith import SampleFactory, load_config
 
-- Example 1 — set source path/type/column inline:
-```bash
-python -m ocrsmith.core.app --num-samples 100 --output-dir outputs \
-  --set text_data.source_path=assets/text_data/sentences.csv \
-  --set text_data.source_type=csv \
-  --set text_data.text_column=darija_ar \
-  --set seed=123 \
-  --workers 4
+factory = SampleFactory(load_config())
+for sample in factory.create(index=0):
+    sample.image.save(f"{sample.id}.png")
+    print(sample.page.to_markdown())
+    for word in sample.page.iter_words():
+        print(word.text, word.bbox.as_tuple())
 ```
 
-- Example 2 — specify a config file (update src/ocrsmith/config/default_config.yaml first if needed):
-```bash
-python -m ocrsmith.core.app --config src/ocrsmith/config/default_config.yaml \
-  --num-samples 100 --output-dir outputs --workers 6 --seed 123
+## What comes out
+
+```
+data/train/
+├── images/                     # one PNG/JPEG per page
+├── annotations-00000.jsonl     # one record per page
+└── .shard-00000.done           # completion marker, so a rerun resumes
 ```
 
-- Example 3 — use the built-in default config (no --config):
-```bash
-python -m ocrsmith.core.app --num-samples 100 --output-dir outputs --workers 6 --seed 123
-```
+Each record carries the full annotation tree plus both markup serialisations:
 
-You can also update the default config file at src/ocrsmith/config/default_config.yaml (fonts, text_data, layout, augmentations, etc.) and run with the --config option shown above.
-
----
-
-## 🔧 Configuration
-
-OCRSmith uses YAML configuration files for easy customization:
-
-```yaml
-# config/default_config.yaml
-backgrounds:
-  solid:
-    enabled: true
-    colors: ["#FFFFFF", "#F0F0F0", "#E0E0E0"]
-  
-  gradient:
-    enabled: true
-    directions: ["horizontal", "vertical", "diagonal"]
-  
-  noise:
-    enabled: true
-    intensity: [0.1, 0.3]
-
-fonts:
-  default_size: 24
-  size_range: [16, 32]
-  paths: ["assets/fonts"]
-
-placement:
-  default_strategy: "random"
-  margins:
-    x: 20
-    y: 20
-
-augmentation:
-  noise:
-    enabled: true
-    factor: 0.05
-    probability: 0.3
-  
-  blur:
-    enabled: true
-    radius: 0.5
-    probability: 0.2
-```
-
----
-
-## 📊 Supported Font Collections
-
-OCRSmith includes extensive font support:
-
-### Arabic Fonts
-
-- **Amiri**: Traditional Arabic typography (Regular, Bold, Italic, BoldItalic)
-- **Fustat**: Modern Arabic font family (7 weights)
-- **IBM Plex Sans Arabic**: Professional Arabic fonts (7 weights)
-- **Kufam**: Versatile Arabic/Latin dual-script font (10 styles)
-- **Mada**: Clean, modern Arabic font (8 weights)
-- **Mirza**: Elegant Arabic display font (4 weights)
-- **Noto Sans Arabic**: Google's comprehensive Arabic font family
-- **Noto Kufi Arabic**: Kufi-style Arabic fonts
-- **Noto Naskh Arabic**: Traditional Naskh Arabic fonts
-- **Vazirmatn**: High-quality Persian/Arabic font (9 weights)
-
-### Latin Fonts
-
-- **IBM Plex Sans**: Modern, professional Latin fonts
-- **Noto Sans Mono**: Monospace fonts for technical text
-
----
-
-## 📈 Dataset Generation
-
-### Output Format
-
-OCRSmith generates datasets with rich annotations:
-
-```json
+```jsonc
 {
-  "image_path": "sample_000001.png",
-  "text": "النص العربي للاختبار",
-  "bbox": [45, 67, 234, 98],
-  "placement_metadata": {
-    "placement_type": "random",
-    "position": [45, 67],
-    "margins": [20, 20],
-    "content_type": "body_text"
+  "id": "00000042_01",
+  "image_path": "images/00000042_01.png",
+  "text": "تقرير سنوي\nيحتوي هذا التقرير على جداول وأرقام…",
+  "markdown": "# تقرير سنوي\n\nيحتوي هذا التقرير…",
+  "html": "<h1>تقرير سنوي</h1>\n<p>يحتوي هذا التقرير…</p>",
+  "page": {
+    "width": 1240, "height": 1754, "direction": "rtl",
+    "regions": [
+      {
+        "type": "title", "bbox": [...], "reading_order": 0,
+        "lines": [{ "text": "تقرير سنوي", "bbox": [...], "direction": "rtl",
+                    "words": [{ "text": "تقرير", "bbox": [...] }] }]
+      },
+      { "type": "table", "bbox": [...], "table": { "rows": 4, "cols": 3, "cells": [...] } }
+    ]
+  },
+  "provenance": {
+    "seed": 918273645, "template": "report", "font_path": ".../Amiri-Regular.ttf",
+    "background": "paper", "degradations": [{ "name": "PerspectiveWarp", "magnitude": 0.03 }],
+    "extra": { "index": 42, "page": 1, "preset": "photo", "dpi": 150, "columns": 2 }
   }
 }
 ```
 
-### Batch Generation
+### Output formats
 
-```python
-# Generate large datasets efficiently
-engine.generate_dataset(
-    num_samples=10000,
-    output_dir="large_dataset",
-    placement_strategies=['random', 'center', 'title']
-)
+`--format` selects the writer: `jsonl`, `parquet`, `webdataset`, `coco`, `paddleocr`,
+`chat`. See [docs/formats.md](docs/formats.md).
+
+## How it fits together
+
+```
+config/         one validated GenerationConfig describing a whole corpus
+  ↓
+text/           script detection · normalisation policy · bidi + shaping · glyph coverage
+core/documents/ content model → typography → flow layout → pages
+core/rendering/ text drawn word by word, emitting word boxes in the same pass
+core/degradations/ capture conditions; geometric ones move the annotation too
+  ↓
+domain/         Page → Region → Line → Word (+ Table), immutable and serialisable
+  ↓
+quality/        validate the page, then count what the corpus contains
+datasets/       six writers behind one SampleSink protocol
+evaluation/     CER · WER · NED · table similarity · detection P/R/F1
 ```
 
----
+Longer version: [docs/architecture.md](docs/architecture.md).
 
-## 🎨 Customization
+## Configuring a corpus
 
-### Adding Custom Placement Strategies
+A corpus is defined by its *distributions*, so every per-sample choice is a range or a
+weight map rather than a fixed value:
 
-```python
-class CustomPlacementStrategy(TextPlacementStrategy):
-    def place_text(self, text_image, background_image, **kwargs):
-        # Custom placement logic
-        x, y = self.calculate_position(text_image, background_image)
-  
-        # Compose image
-        composed_image = background_image.copy()
-        composed_image.paste(text_image, (x, y), text_image)
-  
-        # Return result with metadata
-        bbox = (x, y, x + text_image.size[0], y + text_image.size[1])
-        metadata = {'placement_type': 'custom', 'position': (x, y)}
-  
-        return PlacementResult(composed_image, bbox, metadata)
+```yaml
+page:
+  papers: { a4: 4.0, a5: 1.0, letter: 1.0 }
+  dpi_range: [110, 200]
+  columns: { 1: 3.0, 2: 1.0 }
 
-# Register custom strategy
-placement_manager.register_strategy('custom', CustomPlacementStrategy())
+templates:
+  weights: { article: 3.0, report: 2.0, newspaper: 1.5, letter: 1.0, form: 1.0, invoice: 1.0 }
+
+degradations:
+  presets: { clean: 1.0, scan: 4.0, photo: 3.0, fax: 0.5, archive: 1.0 }
 ```
 
-### Adding Custom Augmentations
-
-```python
-class CustomAugmentation(AugmentationStrategy):
-    def apply(self, image, **kwargs):
-        # Custom augmentation logic
-        return modified_image
-
-# Add to pipeline
-engine.augmentation_pipeline.add_augmentation(
-    CustomAugmentation(), 
-    probability=0.4
-)
-```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### Development Setup
+Override anything from the command line:
 
 ```bash
-# Create and activate conda environment
-conda create -n ocrsmith python=3.10 -y
-conda activate ocrsmith
-
-# Clone the repository
-git clone https://github.com/yourusername/OCRSmith.git
-cd OCRSmith
-
-# Install in development mode
-pip install -e .
-
-# Run tests
-pytest tests/
+ocrsmith generate --set page.columns='{"2":1}' --set degradations.presets='{"photo":1}'
 ```
 
----
+Full reference: [docs/configuration.md](docs/configuration.md). Ready-made corpora:
+[examples/configs](examples/configs).
 
-## 📄 License
+## Reproducibility
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Every sample's seed is *derived*, never drawn:
 
----
-
-## 🙏 Acknowledgments
-
-Font providers for high-quality Arabic and Latin fonts
-
-The OCR community for inspiration and feedback
-
-Contributors who help improve OCRSmith
-
----
-
-*Made with ❤️ for the OCR community*
-pip install -e .
-
-# Run tests
-pytest tests/
+```python
+sample_seed(index) = f(config.seed, index)
 ```
 
----
+So sample 8 412 of a ten-million-page run can be regenerated on its own, months later,
+without replaying anything — which is what makes a synthetic dataset debuggable.
 
-## 📄 License
+```bash
+ocrsmith preview --set run.start_index=8412 --count 1 --boxes
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Scale
 
----
+- Generation is a **generator end to end**; a ten-million-page run holds one page in memory.
+- Work is **sharded**, and each worker writes its own shard rather than shipping images
+  back through a pickle queue.
+- A completed shard is marked done, so an interrupted job **resumes** instead of restarting.
+- Font metrics are cached per `(font, size, shaper)`, which is most of the cost of laying
+  out a page.
 
-## 🙏 Acknowledgments
+```bash
+ocrsmith generate -n 1000000 --workers 32 --format webdataset -o /mnt/data/ocr
+```
 
-Font providers for high-quality Arabic and Latin fonts
+## Evaluating a model on it
 
-The OCR community for inspiration and feedback
+```bash
+ocrsmith generate -n 2000 -o data/bench --set seed=777
+# … run your model, write {sample_id: prediction} to predictions.json …
+ocrsmith evaluate data/bench predictions.json --ignore-diacritics
+```
 
-Contributors who help improve OCRSmith
+```python
+from ocrsmith.evaluation import evaluate, load_references
 
----
+report = evaluate(load_references("data/bench", target="markdown"), predictions)
+print(report.to_markdown())
+print(report.worst(10))          # where to start debugging
+```
 
-*Made with ❤️ for the OCR community*
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests are the specification: run `pytest` from a
+fresh clone, no install required.
+
+## Licence and credits
+
+MIT — see [LICENSE](LICENSE). Bundled fonts are distributed under their own licences
+(SIL OFL for the Noto, Amiri, Mada, Fustat, Kufam, Mirza and Vazirmatn families).
+
+Built for the [AtlasIA](https://github.com/atlasia-ma) effort to bring Moroccan Darija
+into open models.
