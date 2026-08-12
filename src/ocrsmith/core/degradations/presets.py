@@ -58,8 +58,10 @@ def _photo() -> DegradationPipeline:
     """Phone photograph: perspective, uneven light, glare, motion, heavy compression."""
     return DegradationPipeline(
         [
-            PerspectiveWarp(magnitude=(0.01, 0.06), probability=0.85),
-            Rotation(max_angle=4.0, probability=0.6),
+            # A photographed page sits on a surface, not on more paper, so the area the
+            # warp exposes is filled with a neutral desk grey rather than white.
+            PerspectiveWarp(magnitude=(0.01, 0.06), fill=(118, 116, 112), probability=0.85),
+            Rotation(max_angle=4.0, fill=(118, 116, 112), probability=0.6),
             Shadow(strength=(0.1, 0.45), probability=0.7),
             Glare(strength=(0.1, 0.4), probability=0.35),
             Vignette(strength=(0.1, 0.4), probability=0.5),

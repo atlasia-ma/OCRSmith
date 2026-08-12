@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `ocrsmith.pipeline`: streaming generation.
+  - `SampleFactory.create(index)` derives a per-sample seed from `(config.seed, index)`
+    and yields one annotated `Sample` per page. Any sample can be regenerated on its own,
+    without replaying the run that produced it.
+  - `iter_samples` is a generator end to end, so a ten-million-page run holds one page in
+    memory at a time.
+  - Work is sharded, and each worker *writes* its own shard rather than shipping images
+    back through a pickle queue. Completed shards are marked, so an interrupted job
+    resumes instead of restarting.
+- `ocrsmith.datasets.writers`: six output formats behind one `SampleSink` protocol —
+  `jsonl`, `parquet`, `webdataset`, `coco` (word/line/region instances), `paddleocr`
+  (detection labels plus line crops) and `chat` (image + instruction + Markdown answer for
+  vision-language fine-tuning). Sinks write incrementally, so a killed run leaves valid
+  shards rather than one truncated file.
+- `ocrsmith.config`: a single validated `GenerationConfig` describing a whole corpus, with
+  every per-sample choice expressed as a distribution. Dotted-key CLI overrides
+  (`--set run.workers=8`) and a JSON-serialisable payload that crosses the process
+  boundary intact.
+- New `ocrsmith` CLI (typer + rich): `generate`, `preview`, `fonts`, `doctor`,
+  `show-config`. `doctor` reports whether this machine can produce correct Arabic; the CLI
+  forces UTF-8 output so a cp1252 Windows console cannot crash a tool whose entire purpose
+  is Arabic text.
 - `ocrsmith.core.degradations`: capture-condition modelling, where every degradation takes
   the annotation as well as the image and returns both.
   - Geometric: `Rotation` and `PerspectiveWarp` derive an explicit forward point mapping
@@ -71,6 +93,15 @@ All notable changes to this project are documented here. The format follows
   completed.
 - `HuggingFaceTextLoader` accepts any iterable of mappings, streams records via
   `iter_texts`, and defers the `datasets` import to call time.
+
+### Removed
+
+- The v0 engine and everything coupled to it: `OCRSmithEngine`, `core/app.py`, the four
+  `*Manager` classes, and the `augmentation`, `text_renderers`, `text_placement`,
+  `backgrounds` and `fonts` strategy packages. Their responsibilities now live in
+  `core/rendering`, `core/documents`, `core/degradations`, `core/fonts.py`,
+  `core/backgrounds.py` and `pipeline/`, with word-level ground truth throughout.
+- `ocrsmith.utils`, whose remaining helpers had no callers.
 
 ### Fixed
 
