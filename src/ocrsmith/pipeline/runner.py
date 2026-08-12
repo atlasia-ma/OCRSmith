@@ -17,6 +17,7 @@ exist, which turns "the job died at 80%" into a resume rather than a restart.
 from __future__ import annotations
 
 import os
+from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,7 @@ from pathlib import Path
 from ..config.schema import GenerationConfig
 from ..datasets.writers import build_sink
 from ..domain import Sample
+from ..quality import default_validators
 from .factory import SampleFactory
 
 __all__ = ["GenerationResult", "ShardPlan", "iter_samples", "plan_shards", "run_generation"]
@@ -50,6 +52,8 @@ class GenerationResult:
     pages: int = 0
     shards: int = 0
     failures: int = 0
+    #: Samples dropped by the quality gate, counted by the check that rejected them.
+    rejected: dict = field(default_factory=dict)
     output_dir: Path = field(default_factory=Path)
     skipped_shards: tuple[int, ...] = ()
 
@@ -59,6 +63,7 @@ class GenerationResult:
             "pages": self.pages,
             "shards": self.shards,
             "failures": self.failures,
+            "rejected": dict(self.rejected),
             "output_dir": str(self.output_dir),
             "skipped_shards": list(self.skipped_shards),
         }
@@ -119,7 +124,7 @@ def run_shard(config: GenerationConfig, plan: ShardPlan) -> dict:
     directory.mkdir(parents=True, exist_ok=True)
     marker = _shard_marker(directory, plan.index)
     if marker.exists():
-        return {"shard": plan.index, "pages": 0, "documents": 0, "skipped": True}
+        return {"shard": plan.index, "pages": 0, "documents": 0, "rejected": {}, "skipped": True}
 
     factory = SampleFactory(config)
     sink = build_sink(
@@ -130,17 +135,39 @@ def run_shard(config: GenerationConfig, plan: ShardPlan) -> dict:
         image_quality=config.output.image_quality,
         images_subdir=config.output.images_subdir,
     )
+    gate = default_validators() if config.quality.enabled else None
 
     pages = 0
+    rejected: Counter[str] = Counter()
     documents = set()
     with sink:
         for sample in iter_samples(config, range(plan.start, plan.stop), factory=factory):
+            if gate is not None:
+                report = gate.check(sample)
+                if not report.passed:
+                    rejected[report.failures[0].validator] += 1
+                    continue
             sink.write(sample)
             pages += 1
             documents.add(sample.provenance.extra.get("index"))
 
+    produced = pages + sum(rejected.values())
+    if produced and sum(rejected.values()) / produced > config.quality.max_rejection_rate:
+        # A high rejection rate is a configuration problem, and writing a shard that is
+        # mostly holes would hide it behind a plausible-looking dataset.
+        raise RuntimeError(
+            f"Shard {plan.index} rejected {sum(rejected.values())}/{produced} samples "
+            f"({dict(rejected)}); check the configuration rather than the data."
+        )
+
     marker.write_text(str(pages), encoding="utf-8")
-    return {"shard": plan.index, "pages": pages, "documents": len(documents), "skipped": False}
+    return {
+        "shard": plan.index,
+        "pages": pages,
+        "documents": len(documents),
+        "rejected": dict(rejected),
+        "skipped": False,
+    }
 
 
 def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResult:
@@ -159,6 +186,8 @@ def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResu
         result.pages += summary["pages"]
         result.documents += summary["documents"]
         result.shards += 0 if summary["skipped"] else 1
+        for name, count in summary.get("rejected", {}).items():
+            result.rejected[name] = result.rejected.get(name, 0) + count
         if summary["skipped"]:
             skipped.append(summary["shard"])
         if progress is not None:

@@ -25,6 +25,7 @@ __all__ = [
     "GenerationConfig",
     "OutputConfig",
     "PageConfig",
+    "QualityConfig",
     "RunConfig",
     "TemplateConfig",
     "TextConfig",
@@ -204,6 +205,16 @@ class OutputConfig(BaseModel):
     eval_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
 
 
+class QualityConfig(BaseModel):
+    """Whether generated samples are checked before they reach the dataset."""
+
+    #: Run the default validators and drop samples that fail.
+    enabled: bool = True
+    #: Give up if more than this fraction of samples is rejected — a high rejection rate
+    #: means the configuration is producing unusable pages, not that the data is unlucky.
+    max_rejection_rate: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
 class RunConfig(BaseModel):
     """How much to generate, and with how many processes."""
 
@@ -224,6 +235,7 @@ class GenerationConfig(BaseModel):
     page: PageConfig = Field(default_factory=PageConfig)
     templates: TemplateConfig = Field(default_factory=TemplateConfig)
     degradations: DegradationConfig = Field(default_factory=DegradationConfig)
+    quality: QualityConfig = Field(default_factory=QualityConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     run: RunConfig = Field(default_factory=RunConfig)
 

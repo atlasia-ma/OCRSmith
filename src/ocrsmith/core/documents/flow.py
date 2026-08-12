@@ -109,6 +109,7 @@ class DocumentRenderer:
         while pending and page_number < max_pages:
             image = self._new_canvas(spec, background)
             regions: list[Region] = []
+            furniture = 0
 
             if header is not None and spec.header_height:
                 regions.extend(self._draw_band(image, header, spec.header_box, typography, direction, rng))

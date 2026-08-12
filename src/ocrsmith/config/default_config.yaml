@@ -80,6 +80,13 @@ degradations:
     fax: 0.5
     archive: 1.0
 
+quality:
+  # Validate every page before it reaches the dataset. Synthetic data fails quietly:
+  # blank pages, washed-out text and boxes off the canvas do not raise, they just teach
+  # a model something false.
+  enabled: true
+  max_rejection_rate: 0.5
+
 output:
   dir: outputs/dataset
   format: jsonl
