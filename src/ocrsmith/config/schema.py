@@ -1,208 +1,237 @@
-# src/ocrsmith/config/schema.py
+"""Generation configuration.
+
+One validated object describes an entire corpus: where the text comes from, how pages are
+shaped, which document genres appear and in what proportion, which capture conditions are
+simulated, and where the result is written. Everything that varies per sample is expressed
+as a *distribution* (a range or a weight map) rather than a fixed value, because a corpus
+is defined by its distributions and hard-coding a value silently narrows the dataset.
+
+The config is a plain pydantic model with no runtime objects in it, so it round-trips
+through `model_dump()` and can be handed to a worker process intact — which is what makes
+every sample reproducible from `(seed, index)` alone.
+"""
+
+from __future__ import annotations
+
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+__all__ = [
+    "FALLBACK_SENTENCES",
+    "BackgroundConfig",
+    "DegradationConfig",
+    "FontConfig",
+    "GenerationConfig",
+    "OutputConfig",
+    "PageConfig",
+    "RunConfig",
+    "TemplateConfig",
+    "TextConfig",
+    "TextSourceConfig",
+]
+
+IntRange = tuple[int, int]
+FloatRange = tuple[float, float]
+
+#: A handful of sentences so that `GenerationConfig()` is valid and a fresh clone can
+#: render something without reaching the network. Also the fallback when a configured
+#: corpus turns out to be unreachable mid-run.
+FALLBACK_SENTENCES = [
+    "المغرب بلد يقع في شمال إفريقيا ويطل على المحيط الأطلسي والبحر الأبيض المتوسط.",
+    "تهدف أطلسيا إلى بناء نماذج ذكاء اصطناعي مفتوحة المصدر للغة الدارجة المغربية.",
+    "يحتوي هذا التقرير على جداول وأرقام ومعلومات إضافية مفيدة للقارئ المهتم.",
+    "في سنة 2024 أطلقت المجموعة نموذج OCR جديد يدعم اللغتين العربية والفرنسية.",
+    "تعتمد الطريقة المقترحة على توليد بيانات اصطناعية متنوعة وواقعية قدر الإمكان.",
+    "Synthetic pages are only useful when their labels describe the pixels exactly.",
+]
 
 
 class FontConfig(BaseModel):
+    """Where fonts come from and how big they are drawn."""
+
+    paths: list[str] = Field(default_factory=lambda: ["assets/fonts"])
+    #: Body text size in pixels; every other role is derived from it.
+    size_range: IntRange = (18, 30)
+    #: Reject a (font, text) pair when the face cannot draw every character, rather than
+    #: emitting tofu boxes that contradict the label.
+    require_full_coverage: bool = True
+    #: Optional filename substrings to keep, e.g. ["Noto", "Amiri"].
+    include: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
+
+    @field_validator("size_range")
+    @classmethod
+    def _ordered(cls, value: IntRange) -> IntRange:
+        low, high = value
+        if low <= 0:
+            raise ValueError("font sizes must be positive")
+        return (min(low, high), max(low, high))
+
+
+class TextSourceConfig(BaseModel):
+    """The corpus the documents are written from."""
+
+    type: Literal["csv", "parquet", "huggingface", "inline"] = "inline"
+    path: str | None = None
+    column: str = "text"
+    title_column: str | None = None
+    split: str = "train"
     name: str | None = None
-    path: str
-    size: int | None = 24
+    #: Used when `type` is "inline"; also the fallback when a source yields nothing.
+    sentences: list[str] = Field(default_factory=lambda: list(FALLBACK_SENTENCES))
+    #: Cap on how many rows are read, so a smoke run does not download a whole corpus.
+    limit: int | None = None
+
+    @model_validator(mode="after")
+    def _path_required_for_file_sources(self) -> TextSourceConfig:
+        if self.type in ("csv", "parquet", "huggingface") and not self.path:
+            raise ValueError(f"text source of type {self.type!r} needs a path")
+        if self.type == "inline" and not self.sentences:
+            raise ValueError("inline text source needs at least one sentence")
+        return self
 
 
-class SolidBackgroundConfig(BaseModel):
-    type: Literal["solid"]
-    color: str | tuple[int, int, int] = (255, 255, 255)
-    weight: float = 1.0
+class NormalizationConfig(BaseModel):
+    """Label-affecting text transforms. Every one of these changes the ground truth."""
+
+    strip_diacritics: bool = False
+    strip_tatweel: bool = False
+    unify_alef: bool = False
+    unify_ya: bool = False
+    numerals: Literal["keep", "western", "arabic_indic", "eastern_arabic_indic"] = "keep"
+    collapse_whitespace: bool = True
 
 
-class ImageBackgroundConfig(BaseModel):
-    type: Literal["image"]
-    image_path: str
-    mode: Literal["stretch", "crop", "tile", "center"] = "stretch"
-    weight: float = 1.0
+class TextConfig(BaseModel):
+    source: TextSourceConfig = Field(default_factory=TextSourceConfig)
+    normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
+    #: "auto" reads the direction from the text itself.
+    direction: Literal["auto", "rtl", "ltr"] = "auto"
 
 
-class GradientBackgroundConfig(BaseModel):
-    type: Literal["gradient"]
-    start_color: tuple[int, int, int] = (255, 255, 255)
-    end_color: tuple[int, int, int] = (200, 200, 200)
-    direction: Literal["horizontal", "vertical", "diagonal"] = "horizontal"
-    weight: float = 1.0
+class BackgroundConfig(BaseModel):
+    """Paper appearance, sampled per document."""
+
+    kinds: dict[str, float] = Field(
+        default_factory=lambda: {"paper": 3.0, "solid": 1.0, "gradient": 0.5, "image": 0.0}
+    )
+    #: Directory or file paths used by the "image" kind.
+    image_paths: list[str] = Field(default_factory=list)
+    #: Base paper tint sampled between these two colours.
+    tint_range: tuple[tuple[int, int, int], tuple[int, int, int]] = ((238, 234, 226), (255, 255, 255))
+
+    @model_validator(mode="after")
+    def _needs_one_kind(self) -> BackgroundConfig:
+        if not any(weight > 0 for weight in self.kinds.values()):
+            raise ValueError("at least one background kind must have a positive weight")
+        if self.kinds.get("image", 0) > 0 and not self.image_paths:
+            raise ValueError("background kind 'image' needs image_paths")
+        return self
 
 
-class TextureBackgroundConfig(BaseModel):
-    type: Literal["texture"]
-    base_color: tuple[int, int, int] = (240, 240, 240)
-    noise_level: int = Field(default=20, ge=0, le=255)
-    weight: float = 1.0
+class PageConfig(BaseModel):
+    """Page geometry, sampled per document."""
+
+    papers: dict[str, float] = Field(default_factory=lambda: {"a4": 4.0, "a5": 1.0, "letter": 1.0})
+    dpi_range: IntRange = (110, 200)
+    margin_mm_range: FloatRange = (12.0, 28.0)
+    columns: dict[int, float] = Field(default_factory=lambda: {1: 3.0, 2: 1.0})
+    landscape_probability: float = Field(default=0.05, ge=0.0, le=1.0)
+    header_probability: float = Field(default=0.35, ge=0.0, le=1.0)
+    footer_probability: float = Field(default=0.45, ge=0.0, le=1.0)
+    background: BackgroundConfig = Field(default_factory=BackgroundConfig)
+    #: Hard ceiling on how many pages one document may occupy.
+    max_pages: int = Field(default=3, ge=1)
+
+    @model_validator(mode="after")
+    def _weights_are_usable(self) -> PageConfig:
+        if not any(weight > 0 for weight in self.papers.values()):
+            raise ValueError("at least one paper size must have a positive weight")
+        if not any(weight > 0 for weight in self.columns.values()):
+            raise ValueError("at least one column count must have a positive weight")
+        return self
 
 
-BackgroundConfigUnion = (
-    SolidBackgroundConfig | ImageBackgroundConfig | GradientBackgroundConfig | TextureBackgroundConfig
-)
+class TemplateConfig(BaseModel):
+    """Which document genres appear, and how often."""
+
+    weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "article": 3.0,
+            "report": 2.0,
+            "newspaper": 1.5,
+            "letter": 1.0,
+            "form": 1.0,
+            "invoice": 1.0,
+        }
+    )
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> TemplateConfig:
+        if not any(weight > 0 for weight in self.weights.values()):
+            raise ValueError("at least one template must have a positive weight")
+        return self
 
 
-class SimpleTextRendererConfig(BaseModel):
-    type: Literal["simple"]
-    color: tuple[int, int, int] = (0, 0, 0)
-    weight: float = 1.0
+class DegradationConfig(BaseModel):
+    """Capture conditions, weighted so a corpus can be balanced deliberately."""
 
+    presets: dict[str, float] = Field(
+        default_factory=lambda: {"clean": 1.0, "scan": 4.0, "photo": 3.0, "fax": 0.5, "archive": 1.0}
+    )
 
-class OutlinedTextRendererConfig(BaseModel):
-    type: Literal["outlined"]
-    fill_color: tuple[int, int, int] = (255, 255, 255)
-    outline_color: tuple[int, int, int] = (0, 0, 0)
-    outline_width: int = 2
-    weight: float = 1.0
-
-
-class ShadowedTextRendererConfig(BaseModel):
-    type: Literal["shadowed"]
-    text_color: tuple[int, int, int] = (0, 0, 0)
-    shadow_color: tuple[int, int, int] = (128, 128, 128)
-    shadow_offset: tuple[int, int] = (2, 2)
-    weight: float = 1.0
-
-
-class GradientTextRendererConfig(BaseModel):
-    type: Literal["gradient"]
-    start_color: tuple[int, int, int] = (255, 0, 0)
-    end_color: tuple[int, int, int] = (0, 0, 255)
-    weight: float = 1.0
-
-
-class HorizontalTextRendererConfig(BaseModel):
-    type: Literal["horizontal"]
-    weight: float = 1.0
-
-
-TextRendererConfigUnion = (
-    HorizontalTextRendererConfig
-    | SimpleTextRendererConfig
-    | OutlinedTextRendererConfig
-    | ShadowedTextRendererConfig
-    | GradientTextRendererConfig
-)
-
-
-class CenterPlacementConfig(BaseModel):
-    type: Literal["center"]
-    padding: int = 20
-    weight: float = 1.0
-
-
-class RandomPlacementConfig(BaseModel):
-    type: Literal["random"]
-    margin: int = 50
-    weight: float = 1.0
-
-
-class GridPlacementConfig(BaseModel):
-    type: Literal["grid"]
-    rows: int = 3
-    cols: int = 3
-    padding: int = 10
-    weight: float = 1.0
-
-
-class PageNumberPlacementConfig(BaseModel):
-    type: Literal["page_number"]
-    position: Literal["bottom_left", "bottom_right", "bottom_center"] = "bottom_right"
-    margin: int = 20
-    weight: float = 1.0
-
-
-class PageTitlePlacementConfig(BaseModel):
-    type: Literal["page_title"]
-    position: Literal["top_left", "top_right", "top_center"] = "top_center"
-    margin: int = 30
-    weight: float = 1.0
-
-
-TextPlacementConfigUnion = (
-    CenterPlacementConfig
-    | RandomPlacementConfig
-    | GridPlacementConfig
-    | PageNumberPlacementConfig
-    | PageTitlePlacementConfig
-)
-
-
-class BaseAugmentationConfig(BaseModel):
-    probability: float | None = 1.0
-    enabled: bool | None = True
-    weight: float = 1.0
-
-
-class BlurAugmentationConfig(BaseAugmentationConfig):
-    type: Literal["blur"]
-    blur_radius: float | tuple[float, float] = 1.0
-
-
-class NoiseAugmentationConfig(BaseAugmentationConfig):
-    type: Literal["noise"]
-    noise_factor: float | tuple[float, float] = 0.1
-
-
-class RotationAugmentationConfig(BaseAugmentationConfig):
-    type: Literal["rotation"]
-    max_angle: float | tuple[float, float] = 5.0
-
-
-class BrightnessAugmentationConfig(BaseAugmentationConfig):
-    type: Literal["brightness"]
-    brightness_factor: float | tuple[float, float] = 0.8
-
-
-AugmentationConfigUnion = (
-    BlurAugmentationConfig
-    | NoiseAugmentationConfig
-    | RotationAugmentationConfig
-    | BrightnessAugmentationConfig
-)
-
-
-class LayoutConfig(BaseModel):
-    type: str
-    padding: int | None = 50
-    max_width: int | None = None
-    max_height: int | None = None
-    min_width: int | None = None
-    min_height: int | None = None
+    @model_validator(mode="after")
+    def _at_least_one(self) -> DegradationConfig:
+        if not any(weight > 0 for weight in self.presets.values()):
+            raise ValueError("at least one degradation preset must have a positive weight")
+        return self
 
 
 class OutputConfig(BaseModel):
-    images_dir: str
-    metadata_file: str
+    """Where the dataset is written and in what shape."""
+
+    dir: str = "outputs/dataset"
+    format: Literal["jsonl", "parquet", "webdataset", "coco", "paddleocr", "chat"] = "jsonl"
+    image_format: Literal["png", "jpeg", "webp"] = "png"
+    image_quality: int = Field(default=92, ge=1, le=100)
+    images_subdir: str = "images"
+    #: Samples per shard. Sharding is what makes a large run resumable and parallel.
+    shard_size: int = Field(default=1000, ge=1)
+    #: Also emit per-line crops for recognition training.
+    line_crops: bool = False
+    #: Fraction of samples routed to a held-out split.
+    eval_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
 
 
-class DatasetConfig(BaseModel):
-    source: str
-    path: str
+class RunConfig(BaseModel):
+    """How much to generate, and with how many processes."""
+
+    num_samples: int = Field(default=100, ge=1)
+    workers: int = Field(default=1, ge=1)
+    #: Skip samples whose index is below this, so an interrupted run can continue.
+    start_index: int = Field(default=0, ge=0)
+    #: Give up on a document after this many consecutive failures rather than spinning.
+    max_consecutive_failures: int = Field(default=50, ge=1)
 
 
-class TextDataConfig(BaseModel):
-    """Configuration for loading text data from various sources."""
+class GenerationConfig(BaseModel):
+    """A complete corpus specification."""
 
-    source_type: Literal["csv", "parquet", "huggingface"]
-    source_path: str
-    text_column: str = "text"
-    title_column: str | None = None
-    # Optional fields, mainly for Hugging Face datasets
-    split: str | None = "train"
-    name: str | None = None  # For datasets with multiple configurations (e.g., 'wikitext-103-raw-v1')
-    data_dir: str | None = None  # For datasets that require manual download
+    seed: int | None = 1234
+    fonts: FontConfig = Field(default_factory=FontConfig)
+    text: TextConfig = Field(default_factory=TextConfig)
+    page: PageConfig = Field(default_factory=PageConfig)
+    templates: TemplateConfig = Field(default_factory=TemplateConfig)
+    degradations: DegradationConfig = Field(default_factory=DegradationConfig)
+    output: OutputConfig = Field(default_factory=OutputConfig)
+    run: RunConfig = Field(default_factory=RunConfig)
 
+    def sample_seed(self, index: int) -> int:
+        """Deterministic per-sample seed.
 
-class AppConfig(BaseModel):
-    fonts: list[FontConfig]
-    backgrounds: list[BackgroundConfigUnion]
-    text_renderers: list[TextRendererConfigUnion] | None = []
-    text_placements: list[TextPlacementConfigUnion] | None = []
-    augmentations: list[AugmentationConfigUnion] | None = []
-    augmentation_order: Literal["random", "fixed"] = "random"
-    layout: LayoutConfig
-    output: OutputConfig
-    text_data: TextDataConfig | None = None
-    seed: int | None = None
+        Derived rather than drawn, so sample 8_412 of a run is regenerable on its own
+        without replaying the 8_411 before it.
+        """
+        base = 0 if self.seed is None else int(self.seed)
+        return (base * 1_000_003 + index * 2_654_435_761) % (2**32)

@@ -1,58 +1,49 @@
+"""Shared fixtures.
+
+Deliberately small: most tests build exactly the objects they need, because a fixture that
+serves ten tests tends to drift into serving none of them well.
+"""
+
 import os
 import tempfile
 
-import pandas as pd
 import pytest
 from PIL import Image
+
+FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts")
 
 
 @pytest.fixture
 def temp_dir():
-    """Create a temporary directory for tests"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
 def sample_text_image():
-    """Create a sample text image for testing"""
-    img = Image.new("RGBA", (100, 50), (0, 0, 0, 255))
-    return img
+    return Image.new("RGBA", (100, 50), (0, 0, 0, 255))
 
 
 @pytest.fixture
 def sample_background_image():
-    """Create a sample background image for testing"""
-    img = Image.new("RGBA", (200, 100), (255, 255, 255, 255))
-    return img
+    return Image.new("RGBA", (200, 100), (255, 255, 255, 255))
 
 
 @pytest.fixture
 def sample_csv_file(temp_dir):
-    """Create a sample CSV file for testing"""
-    data = {
-        "text": [
-            "Hello world",
-            "يَا أَيُّهَا النَّاسُ اعْبُدُوا رَبَّكُمُ الَّذِي خَلَقَكُمْ وَالَّذِينَ مِن قَبْلِكُمْ لَعَلَّكُمْ تَتَّقُونَ",
-            "Test text",
-            "النص العربي",
-        ],
-        "language": ["en", "ar", "en", "ar"],
-    }
-    df = pd.DataFrame(data)
-    csv_path = os.path.join(temp_dir, "test_data.csv")
-    df.to_csv(csv_path, index=False)
-    return csv_path
-
-
-@pytest.fixture
-def sample_config():
-    """Sample configuration for testing"""
-    return {
-        "backgrounds": {
-            "solid": {"enabled": True, "colors": ["#FFFFFF", "#000000"]},
-            "gradient": {"enabled": True, "directions": ["horizontal", "vertical"]},
-        },
-        "fonts": {"default_size": 24, "paths": ["assets/fonts"]},
-        "placement": {"default_strategy": "random", "margins": {"x": 20, "y": 20}},
-    }
+    """A small bilingual CSV, including a fully vocalised Arabic row."""
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(
+        {
+            "text": [
+                "Hello world",
+                "يَا أَيُّهَا النَّاسُ اعْبُدُوا رَبَّكُمُ الَّذِي خَلَقَكُمْ",
+                "Test text",
+                "النص العربي",
+            ],
+            "language": ["en", "ar", "en", "ar"],
+        }
+    )
+    path = os.path.join(temp_dir, "test_data.csv")
+    frame.to_csv(path, index=False)
+    return path
