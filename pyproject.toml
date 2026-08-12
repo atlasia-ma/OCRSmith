@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ocrsmith"
-version = "0.1.0"
+version = "1.0.0"
 description = "Synthetic document and OCR dataset forge for Arabic, Darija and Latin scripts."
 readme = "README.md"
 authors = [
@@ -20,7 +20,7 @@ keywords = [
     "document understanding",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",

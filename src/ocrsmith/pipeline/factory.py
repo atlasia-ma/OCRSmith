@@ -11,6 +11,7 @@ dataset debuggable at all.
 
 from __future__ import annotations
 
+import logging
 import random
 from collections.abc import Iterator
 from pathlib import Path
@@ -203,16 +204,31 @@ def build_text_provider(config: GenerationConfig) -> CorpusTextProvider:
         "huggingface": HuggingFaceTextLoader,
     }
     loader = loaders[source.type](text_column=source.column, title_column=source.title_column)
-    if source.type == "huggingface":
-        records = loader.iter_texts(str(source.path), split=source.split)
-    else:
-        records = iter(loader.load_texts(str(Path(source.path))))
-
     texts: list[str] = []
-    for record in records:
-        texts.append(record["content"] if isinstance(record, dict) else str(record))
-        if source.limit and len(texts) >= source.limit:
-            break
+    try:
+        if source.type == "huggingface":
+            records = loader.iter_texts(str(source.path), split=source.split)
+        else:
+            records = iter(loader.load_texts(str(Path(source.path))))
+        for record in records:
+            texts.append(record["content"] if isinstance(record, dict) else str(record))
+            if source.limit and len(texts) >= source.limit:
+                break
+    except Exception as exc:
+        # A gated or offline corpus should degrade to the configured fallback rather than
+        # killing a run, but it must say so: silently generating from six placeholder
+        # sentences would look like success and produce a worthless dataset.
+        if not source.sentences:
+            raise
+        logging.getLogger(__name__).warning(
+            "Text source %r is unavailable (%s); falling back to %d inline sentences. "
+            "The generated corpus will have almost no lexical variety.",
+            source.path,
+            exc,
+            len(source.sentences),
+        )
+        return CorpusTextProvider(source.sentences)
+
     if not texts:
         if not source.sentences:
             raise ValueError(f"Text source {source.path!r} yielded no usable rows")
