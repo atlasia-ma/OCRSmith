@@ -3,7 +3,7 @@
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-from .BaseTextDataLoader import BaseTextDataLoader
+from .base import BaseTextDataLoader
 
 _AUTH_MARKERS = ("401", "403", "Unauthorized", "Permission", "Access")
 _AUTH_HINT = (
