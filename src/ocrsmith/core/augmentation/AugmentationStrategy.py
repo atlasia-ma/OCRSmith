@@ -2,8 +2,8 @@
 
 from abc import ABC, abstractmethod
 
+
 class AugmentationStrategy(ABC):
     @abstractmethod
     def apply():
         pass
-    
