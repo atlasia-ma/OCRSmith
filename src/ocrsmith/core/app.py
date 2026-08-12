@@ -1,7 +1,7 @@
 import argparse
 
 from ocrsmith.config.loader import load_config
-from ocrsmith.core.OCRSmithEngine import OCRSmithEngine
+from ocrsmith.core.engine import OCRSmithEngine
 
 
 def parse_overrides(pairs):
