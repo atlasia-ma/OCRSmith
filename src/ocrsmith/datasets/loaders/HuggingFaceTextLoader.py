@@ -1,58 +1,109 @@
 # src/ocrsmith/datasets/loaders/HuggingFaceTextLoader.py
 
+from collections.abc import Iterator, Mapping
+from typing import Any, Optional
+
 from .BaseTextDataLoader import BaseTextDataLoader
-from datasets import load_dataset, DatasetDict
-from typing import Optional
+
+_AUTH_MARKERS = ("401", "403", "Unauthorized", "Permission", "Access")
+_AUTH_HINT = (
+    " Authentication may be required. Run 'huggingface-cli login', pass a token via "
+    "TextDataManager.load_from_source(..., token=YOUR_HF_TOKEN), or set the HF_TOKEN env var."
+)
+
+
+def load_dataset(*args, **kwargs):  # pragma: no cover - thin lazy proxy
+    """Proxy to ``datasets.load_dataset`` imported at call time.
+
+    Importing ``datasets`` eagerly costs seconds of start-up and pulls a heavy optional
+    dependency into every ``import ocrsmith``. Keeping it behind a module-level function
+    also gives tests a single, stable patch target.
+    """
+    from datasets import load_dataset as _load_dataset
+
+    return _load_dataset(*args, **kwargs)
+
 
 class HuggingFaceTextLoader(BaseTextDataLoader):
-    def __init__(self, text_column='text', title_column=None):
+    """Loads text from a Hugging Face dataset.
+
+    Any object that iterates over mappings is accepted, so in-memory sequences can stand
+    in for a real ``Dataset`` in tests and in offline pipelines.
+    """
+
+    def __init__(self, text_column: str = "text", title_column: Optional[str] = None):
         super().__init__(text_column=text_column, title_column=title_column)
 
-    def load_texts(self, dataset_name, split='train', **kwargs):
-        """Load texts from a Hugging Face dataset.
-        If authentication is required, instruct the user to login and/or set a token.
-        Accepts optional 'token' in kwargs.
-        """
-        token: Optional[str] = kwargs.get('token')
-        try:
-            if token:
-                dataset = load_dataset(dataset_name, split=split, token=token)
-            else:
-                dataset = load_dataset(dataset_name, split=split)
-        except Exception as e:
-            msg = str(e)
-            hint = ""
-            if any(x in msg for x in ['401', '403', 'Unauthorized', 'Permission', 'Access']):
-                hint = (
-                    " Authentication may be required. Run: 'huggingface-cli login' "
-                    "or pass a token via TextDataManager.load_from_source(..., token=YOUR_HF_TOKEN) "
-                    "or set the HF_TOKEN env var."
-                )
-            raise RuntimeError(f"Failed to load dataset '{dataset_name}' (split='{split}').{hint} Original error: {msg}")
-        
-        if isinstance(dataset, DatasetDict):
-            if split in dataset:
-                dataset = dataset[split]
-            else:
-                raise ValueError(f"Split '{split}' not found. Available splits: {list(dataset.keys())}")
-
-        if self.text_column not in dataset.column_names:
-            raise ValueError(f"Column '{self.text_column}' not found. Available columns: {dataset.column_names}")
-
-        # Drop rows with missing text
-        filtered = dataset.filter(lambda x: x[self.text_column] is not None)
-        if self.title_column:
-            if self.title_column not in dataset.column_names:
-                self.title_column = None
-
-            self.texts = [
-                {"content": str(txt), "title": str(title) if title is not None else ""}
-                for txt, title in zip(filtered[self.text_column], filtered[self.title_column])
-            ]
-        else:
-            self.texts = [str(txt) for txt in filtered[self.text_column]]
-
+    def load_texts(self, dataset_name: str, split: str = "train", **kwargs) -> list:
+        dataset = self._open(dataset_name, split, **kwargs)
+        dataset = self._resolve_split(dataset, split)
+        self._check_columns(dataset)
+        self.texts = list(self._iter_records(dataset))
         return self.texts
+
+    def iter_texts(self, dataset_name: str, split: str = "train", **kwargs) -> Iterator:
+        """Stream records without materialising the whole dataset.
+
+        Pass ``streaming=True`` through ``kwargs`` to also avoid downloading it in full.
+        """
+        dataset = self._open(dataset_name, split, **kwargs)
+        dataset = self._resolve_split(dataset, split)
+        self._check_columns(dataset)
+        yield from self._iter_records(dataset)
 
     def __iter__(self):
         return iter(self.texts)
+
+    # -- internals ---------------------------------------------------------
+
+    def _open(self, dataset_name: str, split: str, **kwargs):
+        token = kwargs.pop("token", None)
+        try:
+            if token:
+                return load_dataset(dataset_name, split=split, token=token, **kwargs)
+            return load_dataset(dataset_name, split=split, **kwargs)
+        except Exception as exc:
+            msg = str(exc)
+            hint = _AUTH_HINT if any(marker in msg for marker in _AUTH_MARKERS) else ""
+            raise RuntimeError(
+                f"Failed to load dataset '{dataset_name}' (split='{split}').{hint} Original error: {msg}"
+            ) from exc
+
+    @staticmethod
+    def _resolve_split(dataset: Any, split: str) -> Any:
+        """Unwrap a ``DatasetDict``-like mapping of splits down to a single split.
+
+        ``load_dataset`` returns every split when ``split`` is ignored by the builder,
+        in which case the result is a dict keyed by split name.
+        """
+        if not isinstance(dataset, dict):
+            return dataset
+        if split not in dataset:
+            raise ValueError(f"Split '{split}' not found. Available splits: {list(dataset)}")
+        return dataset[split]
+
+    def _check_columns(self, dataset: Any) -> None:
+        """Validate declared columns when the source exposes them."""
+        columns = getattr(dataset, "column_names", None)
+        if not isinstance(columns, (list, tuple)):
+            return  # duck-typed source: validated per record instead
+        if self.text_column not in columns:
+            raise ValueError(
+                f"Column '{self.text_column}' not found. Available columns: {list(columns)}"
+            )
+        if self.title_column and self.title_column not in columns:
+            self.title_column = None
+
+    def _iter_records(self, dataset: Any) -> Iterator:
+        """Yield one record per usable row, skipping rows without text."""
+        for row in dataset:
+            if not isinstance(row, Mapping):
+                continue
+            value = row.get(self.text_column)
+            if value is None:
+                continue
+            if self.title_column:
+                title = row.get(self.title_column)
+                yield {"content": str(value), "title": "" if title is None else str(title)}
+            else:
+                yield str(value)

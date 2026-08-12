@@ -22,7 +22,8 @@ def test_horizontal_trims_to_max_width_height(monkeypatch):
     from ocrsmith.core.FontManager import FontManager as FM
     def w(f, t):
         return max(1, len(t) * 6)
-    def h(f, t):
+    def h(f, t=None):
+        # Mirrors FontManager.get_text_height, whose `text` argument is optional.
         return 10
     monkeypatch.setattr(FM, 'get_text_width', staticmethod(w))
     monkeypatch.setattr(FM, 'get_text_height', staticmethod(h))

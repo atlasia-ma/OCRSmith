@@ -14,6 +14,9 @@ def wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_h
     if not line_height:
         line_height = FontManager.get_text_height(font)
     text_height = 0
+    # Provide safe defaults if constraints are not provided
+    eff_max_width = max_width if isinstance(max_width, int) and max_width > 0 else 10_000
+    eff_max_height = max_height if isinstance(max_height, int) and max_height > 0 else 10_000
     
     for paragraph in paragraphs:
         words = paragraph.split()          
@@ -21,12 +24,12 @@ def wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_h
         for word in words:
             test_line = current_line + (" " if current_line else "") + word
             w = FontManager.get_text_width(font, test_line)
-            if w <= max_width:
+            if w <= eff_max_width:
                 current_line = test_line
             else:
                 # Add current line if it fits in height
                 if current_line:  # Don't add empty lines
-                    if text_height + line_height + spacing <= max_height:
+                    if text_height + line_height + spacing <= eff_max_height:
                         lines.append(current_line)
                         text_height += line_height + spacing
                     else:
@@ -34,13 +37,13 @@ def wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_h
                 current_line = word
                 
                 # Check if single word exceeds max_width
-                if FontManager.get_text_width(font, word) > max_width:
+                if FontManager.get_text_width(font, word) > eff_max_width:
                     # Handle very long words - you might want to break them or skip them
                     current_line = word  # Keep it anyway, but it will overflow
 
         # Add the last line of the paragraph
         if current_line:
-            if text_height + line_height <= max_height:
+            if text_height + line_height <= eff_max_height:
                 lines.append(current_line)
                 text_height += line_height + spacing
             else:
@@ -75,6 +78,9 @@ class HorizontalRenderingStrategy(BaseTextRenderingStrategy):
         
         line_height = FontManager.get_text_height(font)
         lines = wrap_text_by_pixels(paragraphs, font, max_width, max_height, spacing, line_height)
+        # Guard against empty content (e.g., whitespace-only input)
+        if not lines:
+            lines = [" "]
         
         line_heights = [line_height]*len(lines)
         text_height = sum(line_heights) + (len(lines) - 1) * spacing
