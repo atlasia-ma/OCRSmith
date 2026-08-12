@@ -9,7 +9,7 @@ from PIL import Image
 
 # --- Import all necessary classes ---
 from ocrsmith.config.schema import AppConfig
-from ocrsmith.core.OCRSmithEngine import OCRSmithEngine
+from ocrsmith.core.engine import OCRSmithEngine
 from ocrsmith.core.text_placement import PlacementResult
 
 # --- Fixtures ---
@@ -66,12 +66,12 @@ def temp_dir():
 
 # Patch all managers at the class level to ensure they are mocked for every test.
 # This prevents real managers from being initialized with mock configs.
-@patch("ocrsmith.core.OCRSmithEngine.BackgroundManager")
-@patch("ocrsmith.core.OCRSmithEngine.TextRenderingManager")
-@patch("ocrsmith.core.OCRSmithEngine.TextPlacementManager")
-@patch("ocrsmith.core.OCRSmithEngine.AugmentationManager")
-@patch("ocrsmith.core.OCRSmithEngine.FontManager")
-@patch("ocrsmith.core.OCRSmithEngine.TextDataManager")
+@patch("ocrsmith.core.engine.BackgroundManager")
+@patch("ocrsmith.core.engine.TextRenderingManager")
+@patch("ocrsmith.core.engine.TextPlacementManager")
+@patch("ocrsmith.core.engine.AugmentationManager")
+@patch("ocrsmith.core.engine.FontManager")
+@patch("ocrsmith.core.engine.TextDataManager")
 class TestOCRSmithEngine:
     """Tests for the main OCRSmithEngine class with all dependencies mocked."""
 
