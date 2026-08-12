@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-08-13
+
+### Fixed
+
+- **Shaping was 68% of generation time.** arabic-reshaper 3.0.0 guards its ligature-regex
+  cache with `hasattr(self, '__ligatures_re')`, but writes the cache to
+  `self.__ligatures_re` — which Python mangles to `_ArabicReshaper__ligatures_re` inside
+  the class body, while the string literal passed to `hasattr` is not mangled. The guard
+  therefore checks a name that is never set, and every call rebuilt the regex, re-reading
+  ~290 configparser entries. Laying out one page called it ~1,800 times.
+
+  Two mitigations, both contained to `ocrsmith.text.shaping`: results are cached (shaping
+  is a pure function of the string), and the reshaper's cache is warmed once so the
+  library's own guard fires from the second call. 2,000 distinct strings: 26s -> 0.36s.
+
+### Changed
+
+- Wrapping now measures a line the way the renderer draws it — summing word advances plus
+  space advances — instead of measuring the whole candidate line as one shaped run. This
+  is a correctness improvement as well as a speed one: the two could previously disagree
+  about where a line ends. It also keys the measurement cache on *words*, which repeat,
+  rather than on line prefixes, which never do.
+
+Test suite runtime: 95s -> 20s. Generation throughput on a mixed Arabic corpus improved
+~1.6x end to end; the remaining cost is genuine rasterisation and degradation work.
+
 ## [1.0.0] - 2026-08-12
 
 The first release of OCRSmith as a document forge rather than a line-image generator.
@@ -131,4 +157,5 @@ page before it reaches the dataset.
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
 
+[1.0.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.1
 [1.0.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.0

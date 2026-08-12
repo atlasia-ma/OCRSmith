@@ -81,6 +81,20 @@ class FontMetrics:
     def advance(self, text: str) -> float:
         return self._extent(text).advance
 
+    def line_advance(self, text: str) -> float:
+        """Width of `text` as the renderer will actually lay it out.
+
+        The renderer positions words individually and adds a space advance between them,
+        so measuring the whole string as one shaped run could disagree with what gets
+        drawn. Summing per word also means the measurement cache is keyed on *words*,
+        which repeat, rather than on line prefixes, which never do — wrapping a paragraph
+        asks for "a", "a b", "a b c" … and none of those would ever hit.
+        """
+        words = text.split()
+        if not words:
+            return 0.0
+        return sum(self.advance(word) for word in words) + self.space_advance * (len(words) - 1)
+
     @property
     def space_advance(self) -> float:
         return self._extent(" ").advance

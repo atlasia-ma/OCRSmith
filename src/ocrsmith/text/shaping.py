@@ -65,6 +65,20 @@ class TransparentShaper:
         return ShapedText(logical=text, visual=text, direction=detect_direction(text))
 
 
+#: Shaping is a pure function of the string, so results are cached. This is not a
+#: micro-optimisation: arabic-reshaper 3.0.0 guards its ligature-regex cache with
+#: `hasattr(self, '__ligatures_re')`, and because that string literal is not name-mangled
+#: the guard never fires — so every single call rebuilds the regex, re-reading ~290
+#: configparser entries. Laying out one page called it ~1_800 times, which measured as 68%
+#: of total generation time. Caching here sidesteps it without patching their library.
+_SHAPE_CACHE_SIZE = 200_000
+
+
+@lru_cache(maxsize=_SHAPE_CACHE_SIZE)
+def _visual_form(text: str) -> str:
+    return _bidi_display(_reshape(text))
+
+
 class ReshaperBidiShaper:
     """Substitute Arabic presentation forms and reorder runs to visual order."""
 
@@ -74,8 +88,7 @@ class ReshaperBidiShaper:
         direction = detect_direction(text)
         if not text:
             return ShapedText(logical=text, visual=text, direction=direction)
-        visual = _bidi_display(_reshape(text))
-        return ShapedText(logical=text, visual=visual, direction=direction)
+        return ShapedText(logical=text, visual=_visual_form(text), direction=direction)
 
 
 _BACKENDS: dict[str, type] = {
@@ -118,9 +131,26 @@ def resolve_shaper(backend: str = "auto") -> TextShaper:
 
 @lru_cache(maxsize=1)
 def _reshaper():
-    import arabic_reshaper
+    """A reshaper whose ligature-regex cache actually works.
 
-    return arabic_reshaper.reshape
+    arabic-reshaper 3.0.0 guards that cache with `hasattr(self, '__ligatures_re')`, but
+    writes it to `self.__ligatures_re` — which, inside the class body, Python mangles to
+    `_ArabicReshaper__ligatures_re`. The string passed to `hasattr` is *not* mangled, so
+    the guard checks a name that is never set and the regex is rebuilt on every call,
+    re-reading around 290 configparser entries each time.
+
+    Warming the property once and then setting the unmangled name makes the guard fire
+    from the second call onwards. Reaching into a third-party private attribute is not
+    something to do lightly; it is contained to this adapter, and the alternative is
+    paying that cost on every word of every page.
+    """
+    from arabic_reshaper import ArabicReshaper
+
+    reshaper = ArabicReshaper()
+    reshaper._ligatures_re  # noqa: B018 - builds and caches under the mangled name
+    if not hasattr(reshaper, "__ligatures_re"):
+        object.__setattr__(reshaper, "__ligatures_re", True)
+    return reshaper.reshape
 
 
 @lru_cache(maxsize=1)
