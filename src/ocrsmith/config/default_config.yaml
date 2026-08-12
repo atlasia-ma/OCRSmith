@@ -15,13 +15,15 @@ fonts:
 
 text:
   source:
-    type: huggingface
-    path: atlasia/Moroccan-Darija-Wiki-Dataset
+    # Defaults to the built-in sentences so a fresh clone generates something immediately.
+    # Point this at a real corpus before generating anything you intend to train on -
+    # synthetic layout over six sentences teaches a vocabulary that does not exist.
+    # See examples/configs/darija_scan.yaml for a Hugging Face source.
+    type: inline
     column: content
     title_column: title
     split: train
     limit: 20000
-    # Used if the source is unreachable, so a fresh clone can still generate something.
     sentences:
       - "المغرب بلد يقع في شمال إفريقيا ويطل على المحيط الأطلسي والبحر الأبيض المتوسط."
       - "تهدف أطلسيا إلى بناء نماذج ذكاء اصطناعي مفتوحة المصدر للغة الدارجة المغربية."

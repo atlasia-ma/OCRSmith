@@ -4,7 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-12
+
+The first release of OCRSmith as a document forge rather than a line-image generator.
+The v0 engine produced one image with one string; v1 produces whole pages with word-level
+boxes, typed layout regions, table structure and markup ground truth, and validates every
+page before it reaches the dataset.
 
 ### Added
 
@@ -125,3 +130,5 @@ All notable changes to this project are documented here. The format follows
 - `wrap_text_by_pixels` raised `TypeError` when `layout.max_width` / `layout.max_height`
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
+
+[1.0.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.0
