@@ -28,7 +28,7 @@ from PIL import Image
 
 from ...domain.annotations import Page
 from .base import Degradation, PhotometricDegradation, map_page
-from .photometric import _as_rgb, _sample
+from .photometric import _as_rgb, _axes, _sample
 
 __all__ = ["IlluminationField", "PageCurl", "Wrinkles"]
 
@@ -56,7 +56,7 @@ def _remap(image: Image.Image, dx: np.ndarray, dy: np.ndarray, fill) -> Image.Im
     """
     source = np.asarray(_as_rgb(image))
     height, width = source.shape[:2]
-    ys, xs = np.mgrid[0:height, 0:width]
+    ys, xs = _axes(width, height)
     sample_x = np.clip(np.rint(xs + dx).astype(np.int32), 0, width - 1)
     sample_y = np.clip(np.rint(ys + dy).astype(np.int32), 0, height - 1)
 
@@ -82,6 +82,11 @@ class _DisplacementDegradation(Degradation):
     def apply(self, image: Image.Image, page: Page, rng: random.Random):
         width, height = image.size
         dx, dy = self._field(width, height, rng)[:2]
+        # A field that varies along one axis only is built as a row or column vector; the
+        # remap broadcasts it, but the annotation mapper indexes it per point. Broadcasting
+        # to full shape is a view, so this costs nothing and keeps both readers simple.
+        dx = np.broadcast_to(dx, (height, width))
+        dy = np.broadcast_to(dy, (height, width))
         params = self._field_params
 
         warped = _remap(image, dx, dy, self.fill)
@@ -121,7 +126,7 @@ class Wrinkles(_DisplacementDegradation):
         dx = _smooth_noise((height, width), self.scale, generator) * strength
         dy = _smooth_noise((height, width), self.scale, generator) * strength
         # Ridges are where the sheet bends, i.e. where the displacement changes fastest.
-        gradient = np.abs(np.gradient(dx)[1]) + np.abs(np.gradient(dy)[0])
+        gradient = np.abs(np.gradient(dx, axis=1)) + np.abs(np.gradient(dy, axis=0))
         gradient /= max(1e-6, float(gradient.max()))
         self._shade = 1.0 - shading * gradient
         self._field_params = {"strength": strength, "shading": shading, "scale": self.scale}
@@ -159,7 +164,7 @@ class PageCurl(_DisplacementDegradation):
         strength = _sample(rng, self.strength)
         edge = self.edge if self.edge != "random" else rng.choice(["left", "right", "top", "bottom"])
 
-        ys, xs = np.mgrid[0:height, 0:width].astype(np.float32)
+        ys, xs = _axes(width, height, np.float32)
         if edge in ("left", "right"):
             axis = xs / max(1, width - 1)
             if edge == "right":
