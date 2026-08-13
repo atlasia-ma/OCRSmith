@@ -175,6 +175,33 @@ def run_shard(config: GenerationConfig, plan: ShardPlan) -> dict:
     }
 
 
+def effective_workers(config: GenerationConfig) -> int:
+    """How many workers will actually run, which is not always how many were asked for.
+
+    A shard is the unit of parallelism: a run with two shards uses two processes however
+    many were configured.
+    """
+    plans = plan_shards(config)
+    return min(config.run.workers, len(plans)) if plans else 1
+
+
+def parallelism_advice(config: GenerationConfig) -> str | None:
+    """A sentence naming the throughput being lost, or None when nothing is wrong.
+
+    Silently running 2 of 12 requested workers is a 6x loss on a job measured in days, and
+    the only symptom is that it finishes late. Say it before the run, not after.
+    """
+    actual = effective_workers(config)
+    if actual >= config.run.workers or config.run.workers <= 1:
+        return None
+    suggested = max(1, config.run.num_samples // config.run.workers)
+    return (
+        f"Only {actual} of {config.run.workers} workers can run: there are "
+        f"{len(plan_shards(config))} shard(s) and a shard is the unit of parallelism. "
+        f"Set output.shard_size={suggested} to use them all."
+    )
+
+
 def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResult:
     """Run a complete generation job, in parallel when `run.workers > 1`.
 
@@ -206,7 +233,7 @@ def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResu
         errors.append((plan.index, f"{type(error).__name__}: {error}"))
         result.failures += 1
 
-    workers = min(config.run.workers, len(plans)) if plans else 1
+    workers = effective_workers(config)
     if workers <= 1 or len(plans) == 1:
         for plan in plans:
             try:

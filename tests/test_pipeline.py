@@ -280,6 +280,43 @@ class TestRunGeneration:
         assert records(first) == records(second)
 
 
+class TestParallelismCeiling:
+    """A shard is the unit of parallelism, so `shard_size` caps how many workers can run.
+
+    Asking for twelve workers and getting two is a silent 6x throughput loss on a job
+    measured in days. The pipeline knows the real number; it has to say it.
+    """
+
+    def test_workers_are_capped_by_the_shard_count(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 12}, output={"shard_size": 250})
+
+        assert runner.effective_workers(config) == 2
+
+    def test_a_generous_shard_count_uses_every_worker(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 4}, output={"shard_size": 25})
+
+        assert runner.effective_workers(config) == 4
+
+    def test_the_shard_size_that_would_use_them_all_is_suggested(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 12}, output={"shard_size": 250})
+
+        advice = runner.parallelism_advice(config)
+
+        assert advice is not None
+        assert "2" in advice and "12" in advice
+        assert "output.shard_size" in advice
+
+    def test_no_advice_when_nothing_is_wrong(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 4}, output={"shard_size": 25})
+
+        assert runner.parallelism_advice(config) is None
+
+    def test_a_single_worker_is_never_nagged(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 1}, output={"shard_size": 250})
+
+        assert runner.parallelism_advice(config) is None
+
+
 class TestShardFailures:
     """A shard that dies must say why, and a run that produces nothing must not look fine.
 
