@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Three more genres and a handwriting setting.** Genre coverage is not decoration: a
+  model trained only on flowing prose miscounts dot leaders, misreads slide-sized type,
+  and transfers poorly to the handwriting-heavy Arabic benchmarks.
+  - `contents` — a table of contents with dot leaders, which are their own recognition
+    problem: a long run of identical glyphs that models routinely miscount.
+  - `slide` — a headline and a few short bullets set large; a distinct visual regime that
+    dense-prose training reads poorly.
+  - `notes` — handwritten notes. `TypographySampler(handwritten=True)` prefers a
+    handwriting or calligraphic family and loosens the setting with baseline and word-gap
+    jitter, because a hand holds neither a constant baseline nor an even word gap. This is
+    **not** a substitute for real handwriting data — the letterforms still come from a
+    font — but it covers the layout and the visual regime.
+
 - **Charts with their data** (`ocrsmith.core.documents.charts`). Chart-to-JSON is a
   first-class task in the Arabic document benchmarks and no synthetic generator covered it.
   Bar, horizontal-bar, line and pie charts are drawn *from* their series values, so the

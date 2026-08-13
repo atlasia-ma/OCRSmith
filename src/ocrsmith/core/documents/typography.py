@@ -85,6 +85,31 @@ class FontFamily:
         return self.faces[0]
 
 
+#: Filename fragments that mark a handwriting or calligraphic face. Google Fonts labels
+#: these in its metadata, but a pool assembled from arbitrary directories has only names.
+_HANDWRITING_HINTS = (
+    "hand",
+    "script",
+    "ruqaa",
+    "ruqa",
+    "thuluth",
+    "diwan",
+    "nastaliq",
+    "shekari",
+    "marhey",
+    "lalezar",
+    "gulzar",
+    "qahiri",
+    "reem",
+    "kufi",
+)
+
+
+def _looks_handwritten(name: str) -> bool:
+    lowered = name.lower()
+    return any(hint in lowered for hint in _HANDWRITING_HINTS)
+
+
 def _weight_rank(face: Face) -> int:
     label = (face.variation or face.stem).lower().replace("-", "").replace("_", "").replace(" ", "")
     for rank, keyword in enumerate(_WEIGHT_ORDER):
@@ -169,16 +194,42 @@ class TypographySampler:
         if not self.families:
             raise ValueError("TypographySampler needs at least one font file")
         self.body_size_range = body_size_range
+        self.handwriting_families = tuple(
+            family for family in self.families if _looks_handwritten(family.name)
+        )
 
-    def sample(self, rng: random.Random | None = None, *, direction=None) -> Typography:
+    def sample(
+        self,
+        rng: random.Random | None = None,
+        *,
+        direction=None,
+        handwritten: bool = False,
+    ) -> Typography:
+        """Sample a coherent typography.
+
+        `handwritten` biases towards a handwriting face and loosens the setting - a hand
+        does not hold a constant baseline or an even word gap, and reproducing that
+        wobble is most of what separates a handwritten page from a printed one, given
+        that the letterforms themselves still come from a font.
+        """
         rng = rng or random.Random()
-        family = rng.choice(self.families)
+        families = self.handwriting_families if handwritten and self.handwriting_families else self.families
+        family = rng.choice(families)
         body_size = rng.randint(*self.body_size_range)
         align = Alignment.NATURAL
         # Relative to ascender-to-descender height, not to the em size: Arabic faces have
         # tall metrics, so the range that reads as "normal leading" sits close to 1.0.
-        line_spacing = rng.uniform(0.9, 1.15)
-        ink = rng.choice([(0, 0, 0), (16, 16, 16), (32, 32, 40), (10, 24, 48)])
+        line_spacing = rng.uniform(1.05, 1.45) if handwritten else rng.uniform(0.9, 1.15)
+        ink = (
+            rng.choice([(18, 26, 84), (12, 40, 96), (30, 30, 34)])
+            if handwritten
+            else rng.choice([(0, 0, 0), (16, 16, 16), (32, 32, 40), (10, 24, 48)])
+        )
+        jitter = (
+            {"baseline_jitter": rng.uniform(1.0, 3.0), "word_spacing_jitter": rng.uniform(1.5, 5.0)}
+            if handwritten
+            else {}
+        )
 
         def role(
             face: Face,
@@ -193,7 +244,7 @@ class TypographySampler:
             style = TextStyle(
                 color=ink,
                 line_spacing=spacing if spacing is not None else line_spacing,
-                **{"align": align, **style_kwargs},
+                **{"align": align, **jitter, **style_kwargs},
             )
             return RoleTypography(font, style, space_before=before, space_after=after)
 
