@@ -17,6 +17,7 @@ from ocrsmith.core.degradations import (
     Wrinkles,
     build_preset,
 )
+from ocrsmith.core.degradations.photometric import _axes
 from ocrsmith.domain import BBox, Line, Page, Region, RegionType, Word
 
 
@@ -190,3 +191,39 @@ class TestPresets:
         assert (new_page.width, new_page.height) == result.size
         for region in new_page.regions:
             assert new_page.bbox.contains(region.bbox)
+
+
+class TestFieldConstruction:
+    """Fields are built from broadcast axis vectors rather than two full-page grids.
+
+    `np.mgrid[0:h, 0:w]` costs 60 MB of int64 for an A4 page at 200 dpi before any
+    arithmetic, and every field here is either separable or depends on one axis. The
+    optimisation is only legitimate if the arithmetic is unchanged, so that is what is
+    asserted: the axes must equal the grids they replaced, exactly.
+    """
+
+    @pytest.mark.parametrize("size", [(7, 5), (256, 129)])
+    def test_axes_equal_the_grid_they_replace(self, size):
+        width, height = size
+
+        rows, columns = _axes(width, height)
+        grid_rows, grid_columns = np.mgrid[0:height, 0:width]
+
+        assert np.array_equal(np.broadcast_to(rows, (height, width)), grid_rows)
+        assert np.array_equal(np.broadcast_to(columns, (height, width)), grid_columns)
+
+    def test_axes_do_not_materialise_the_page(self):
+        rows, columns = _axes(4000, 3000)
+
+        assert rows.shape == (3000, 1)
+        assert columns.shape == (1, 4000)
+
+    def test_a_single_axis_field_still_maps_the_annotation(self, striped_page):
+        # PageCurl varies along one axis, so its field is a row or column vector. The
+        # annotation mapper indexes it per point, which broke before it was broadcast.
+        image, page = striped_page
+
+        result, new_page, _ = PageCurl(strength=0.1, edge="left").apply(image, page, random.Random(3))
+
+        assert (new_page.width, new_page.height) == result.size
+        assert new_page.regions[0].bbox != page.regions[0].bbox, "the curl must move the ink"

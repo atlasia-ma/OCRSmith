@@ -52,6 +52,23 @@ def _as_rgb(image: Image.Image) -> Image.Image:
     return image.convert("RGB")
 
 
+def _axes(width: int, height: int, dtype=np.float64) -> tuple[np.ndarray, np.ndarray]:
+    """Row and column coordinates as broadcastable vectors rather than two full grids.
+
+    `np.mgrid[0:height, 0:width]` materialises two `(height, width)` int64 arrays — 60 MB
+    for an A4 page at 200 dpi, before a single arithmetic temporary. Every field built from
+    them here either depends on one axis or is separable, so the grids are pure memory
+    traffic: broadcasting a `(1, width)` against a `(height, 1)` produces identical values.
+
+    float64 by default because that is what integer grids promoted to, and a field is only
+    worth speeding up if the pixels come out the same.
+    """
+    return (
+        np.arange(height, dtype=dtype)[:, None],
+        np.arange(width, dtype=dtype)[None, :],
+    )
+
+
 def _sample(rng: random.Random, value: float | tuple[float, float]) -> float:
     if isinstance(value, (tuple, list)):
         low, high = float(value[0]), float(value[1])
@@ -247,7 +264,7 @@ class Shadow(PhotometricDegradation):
         image = _as_rgb(image)
         width, height = image.size
         angle = rng.uniform(0, 2 * np.pi)
-        ys, xs = np.mgrid[0:height, 0:width]
+        ys, xs = _axes(width, height)
         ramp = (xs / width) * np.cos(angle) + (ys / height) * np.sin(angle)
         ramp = (ramp - ramp.min()) / max(1e-6, ramp.max() - ramp.min())
         mask = (1.0 - strength * ramp)[..., None]
@@ -269,7 +286,7 @@ class Vignette(PhotometricDegradation):
         strength = _sample(rng, self.strength)
         image = _as_rgb(image)
         width, height = image.size
-        ys, xs = np.mgrid[0:height, 0:width]
+        ys, xs = _axes(width, height)
         cx, cy = width / 2, height / 2
         radius = np.sqrt(((xs - cx) / cx) ** 2 + ((ys - cy) / cy) ** 2) / np.sqrt(2)
         mask = (1.0 - strength * radius**2)[..., None]
@@ -291,7 +308,7 @@ class Glare(PhotometricDegradation):
         cx = rng.uniform(0.15, 0.85) * width
         cy = rng.uniform(0.15, 0.85) * height
         spread = rng.uniform(0.15, 0.4) * max(width, height)
-        ys, xs = np.mgrid[0:height, 0:width]
+        ys, xs = _axes(width, height)
         blob = np.exp(-(((xs - cx) ** 2 + (ys - cy) ** 2) / (2 * spread**2)))
         array = np.asarray(image, dtype=np.float32) + (strength * 255.0 * blob)[..., None]
         return Image.fromarray(np.clip(array, 0, 255).astype(np.uint8), "RGB"), {
@@ -318,7 +335,7 @@ class Stains(PhotometricDegradation):
         strength = _sample(rng, self.strength)
         image = _as_rgb(image)
         width, height = image.size
-        ys, xs = np.mgrid[0:height, 0:width]
+        ys, xs = _axes(width, height)
         mask = np.zeros((height, width), dtype=np.float32)
         for _ in range(max(0, count)):
             cx, cy = rng.uniform(0, width), rng.uniform(0, height)
@@ -352,7 +369,7 @@ class Folds(PhotometricDegradation):
         strength = _sample(rng, self.strength)
         image = _as_rgb(image)
         width, height = image.size
-        ys, xs = np.mgrid[0:height, 0:width]
+        ys, xs = _axes(width, height)
         shading = np.zeros((height, width), dtype=np.float32)
         for _ in range(max(0, count)):
             if rng.random() < 0.5:
