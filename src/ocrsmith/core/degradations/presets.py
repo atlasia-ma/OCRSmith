@@ -29,6 +29,7 @@ from .photometric import (
     Stains,
     Vignette,
 )
+from .physical import IlluminationField, PageCurl, Wrinkles
 
 __all__ = ["PRESETS", "build_preset", "preset_names"]
 
@@ -62,6 +63,11 @@ def _photo() -> DegradationPipeline:
             # warp exposes is filled with a neutral desk grey rather than white.
             PerspectiveWarp(magnitude=(0.01, 0.06), fill=(118, 116, 112), probability=0.85),
             Rotation(max_angle=4.0, fill=(118, 116, 112), probability=0.6),
+            # The sheet is not flat and the light is not even; both are what separates a
+            # photographed page from a scanned one.
+            PageCurl(strength=(0.02, 0.09), probability=0.35),
+            Wrinkles(strength=(1.5, 5.0), probability=0.4),
+            IlluminationField(strength=(0.12, 0.4), probability=0.7),
             Shadow(strength=(0.1, 0.45), probability=0.7),
             Glare(strength=(0.1, 0.4), probability=0.35),
             Vignette(strength=(0.1, 0.4), probability=0.5),
@@ -96,6 +102,7 @@ def _archive() -> DegradationPipeline:
             PaperGrain(strength=(8.0, 22.0), probability=0.9),
             Stains(count=(1, 4), strength=(0.05, 0.25), probability=0.8),
             Folds(count=(1, 3), strength=(0.08, 0.3), probability=0.6),
+            Wrinkles(strength=(2.0, 7.0), shading=(0.08, 0.25), probability=0.7),
             Bleedthrough(strength=(0.08, 0.22), probability=0.6),
             InkErosion(size=3, probability=0.4),
             Contrast(factor=(0.6, 0.95), probability=0.7),
