@@ -173,7 +173,7 @@ class SampleFactory:
             # prevent. Fall back to the best face instead, and only that one.
             faces = (self.fonts.choose(probe, rng),)
         sampler = TypographySampler(faces, body_size_range=tuple(self.config.fonts.size_range))
-        return sampler.sample(rng)
+        return sampler.sample(rng, handwritten=bool(content.metadata.get("handwritten")))
 
     @staticmethod
     def _table_style(rng: random.Random) -> TableStyle:

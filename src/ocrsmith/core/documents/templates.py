@@ -25,6 +25,9 @@ from .text_source import TextProvider
 
 __all__ = [
     "ArticleTemplate",
+    "ContentsTemplate",
+    "NotesTemplate",
+    "SlideTemplate",
     "DocumentTemplate",
     "FormTemplate",
     "InvoiceTemplate",
@@ -223,6 +226,75 @@ class NewspaperTemplate:
         return builder.build()
 
 
+@dataclass(frozen=True, slots=True)
+class ContentsTemplate:
+    """A table of contents: label, dot leaders, page number.
+
+    Dot leaders are their own recognition problem - a long run of identical glyphs that
+    models routinely miscount or hallucinate - and no synthetic corpus generates them.
+    """
+
+    name: str = "contents"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.phrase(rng, 2))
+        page = rng.randint(1, 9)
+        for _ in range(rng.randint(8, 16)):
+            label = source.phrase(rng, rng.randint(2, 5))
+            leader = "." * rng.randint(6, 30)
+            builder.paragraph(f"{label} {leader} {page}")
+            page += rng.randint(1, 12)
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class SlideTemplate:
+    """A presentation slide: a headline and a few short bullets, set large.
+
+    Slides are a distinct visual regime - very large type, very little of it - and a model
+    trained only on dense prose reads them poorly.
+    """
+
+    name: str = "slide"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.phrase(rng, rng.randint(2, 5)))
+        builder.list([source.phrase(rng, rng.randint(3, 8)) for _ in range(rng.randint(3, 6))])
+        if rng.random() < 0.4:
+            builder.chart(
+                sample_chart(rng, [source.phrase(rng, 1) for _ in range(4)], title=""),
+                width=rng.randint(280, 420),
+                height=rng.randint(180, 260),
+            )
+        builder.footer(source.phrase(rng, 2))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class NotesTemplate:
+    """Handwritten notes: a heading and loose lines, drawn in a handwriting face.
+
+    The Arabic benchmarks are handwriting-heavy (KHATT, Muharaf, and most of KITAB-Bench's
+    handwritten domain), and a printed-only corpus transfers to them poorly. This is not a
+    substitute for real handwriting data - the letterforms come from a font, so the
+    variability of a human hand is missing - but it covers the layout and the visual
+    regime, and it is honest about which it is.
+    """
+
+    name: str = "notes"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name, handwritten=True)
+        builder.heading(source.phrase(rng, rng.randint(2, 4)))
+        for _ in range(rng.randint(4, 9)):
+            builder.paragraph(source.sentence(rng))
+        if rng.random() < 0.5:
+            builder.list([source.phrase(rng, rng.randint(2, 6)) for _ in range(rng.randint(2, 5))])
+        return builder.build()
+
+
 def _sample_table(source: TextProvider, rng: random.Random) -> list[list[str]]:
     cols = rng.randint(2, 5)
     rows = rng.randint(3, 7)
@@ -285,4 +357,7 @@ def default_registry() -> TemplateRegistry:
         .register(LetterTemplate(), weight=1.0)
         .register(FormTemplate(), weight=1.0)
         .register(InvoiceTemplate(), weight=1.0)
+        .register(ContentsTemplate(), weight=0.8)
+        .register(SlideTemplate(), weight=0.8)
+        .register(NotesTemplate(), weight=1.0)
     )

@@ -182,6 +182,9 @@ class TemplateConfig(BaseModel):
             "letter": 1.0,
             "form": 1.0,
             "invoice": 1.0,
+            "contents": 0.8,
+            "slide": 0.8,
+            "notes": 1.0,
         }
     )
 

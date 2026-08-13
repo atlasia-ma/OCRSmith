@@ -8,13 +8,16 @@ from .page_spec import PAPER_SIZES_MM, PageSpec
 from .table_renderer import BorderStyle, RenderedTable, TableRenderer, TableStyle
 from .templates import (
     ArticleTemplate,
+    ContentsTemplate,
     DocumentTemplate,
     FormTemplate,
     InvoiceTemplate,
     LetterTemplate,
     NewspaperTemplate,
+    NotesTemplate,
     PaperTemplate,
     ReportTemplate,
+    SlideTemplate,
     TemplateRegistry,
     default_registry,
 )
@@ -31,6 +34,9 @@ __all__ = [
     "PAPER_SIZES_MM",
     "ArticleTemplate",
     "Chart",
+    "ContentsTemplate",
+    "NotesTemplate",
+    "SlideTemplate",
     "ChartKind",
     "ChartRenderer",
     "ChartSeries",
