@@ -330,6 +330,91 @@ def evaluate(
         console.print(table)
 
 
+@app.command()
+def compare(
+    synthetic: Path = typer.Argument(..., help="A generated dataset directory (or any image folder)."),
+    real: Path = typer.Argument(..., help="A folder of real document images."),
+    limit: int = typer.Option(0, "--limit", "-n", help="Images per side (0 = all)."),
+    markdown: Path = typer.Option(None, "--markdown", "-m", help="Write the report here."),
+) -> None:
+    """Measure how far a synthetic corpus is from a real one, feature by feature.
+
+    The sim-to-real gap is usually answered with an assertion. This measures it, and every
+    feature maps onto a generator knob - so the report names what to change rather than
+    reporting an abstract divergence.
+    """
+    from .validation import compare_corpora
+
+    report = compare_corpora(synthetic, real, limit=limit)
+    table = Table(title=f"{report.synthetic_count} synthetic vs {report.real_count} real")
+    table.add_column("feature")
+    table.add_column("synthetic", justify="right")
+    table.add_column("real", justify="right")
+    table.add_column("gap", justify="right")
+    table.add_column("overlap", justify="right")
+    table.add_column("verdict")
+    colours = {"matched": "green", "drifting": "yellow", "mismatched": "red"}
+    for item in sorted(report.comparisons, key=lambda c: -abs(c.cohens_d)):
+        table.add_row(
+            item.feature,
+            f"{item.synthetic_mean:.3g}",
+            f"{item.real_mean:.3g}",
+            f"{item.relative_difference:+.0%}",
+            f"{item.overlap:.0%}",
+            f"[{colours[item.verdict]}]{item.verdict}[/]",
+        )
+    console.print(table)
+    console.print(f"Mean distribution overlap: [bold]{report.mean_overlap:.1%}[/]")
+    if markdown:
+        markdown.write_text(report.to_markdown(), encoding="utf-8")
+        console.print(f"[green]Wrote report to[/] {markdown}")
+
+
+@app.command()
+def ablate(
+    name: str = typer.Argument(..., help="Which ablation, e.g. degradations, fonts, layout, diacritics."),
+    config: Path = _CONFIG_OPTION,
+    set_: list[str] = _SET_OPTION,
+    output_root: Path = typer.Option(Path("outputs/ablations"), "--output", "-o"),
+    num_samples: int = typer.Option(None, "--num-samples", "-n", help="Documents per arm."),
+    generate_now: bool = typer.Option(False, "--generate", help="Generate the corpora, not just plan them."),
+) -> None:
+    """Build the corpora that answer "does this feature actually help?".
+
+    Every arm shares the base seed, so the arms differ in exactly the knob under test and
+    in nothing else - otherwise a downstream difference could come from either the feature
+    or the sample, and the experiment answers nothing.
+    """
+    from .validation import PRESET_ABLATIONS, build_ablation
+
+    if name not in PRESET_ABLATIONS:
+        console.print(f"[red]Unknown ablation[/] {name}. Available: {', '.join(sorted(PRESET_ABLATIONS))}")
+        raise typer.Exit(code=1)
+
+    plan = build_ablation(name, load_config(config, set_ or []), output_root, num_samples=num_samples)
+    table = Table(title=f"ablation: {name}")
+    table.add_column("arm")
+    table.add_column("changes")
+    table.add_column("corpus")
+    for variant in plan.variants:
+        table.add_row(variant.name, ", ".join(variant.overrides) or "(baseline)", variant.config.output.dir)
+    console.print(table)
+    console.print(f"Manifest: {plan.write_manifest(output_root)}")
+
+    if not generate_now:
+        console.print("[yellow]Planned only.[/] Re-run with --generate to build the corpora.")
+        return
+
+    for variant in plan.variants:
+        console.print(f"generating [cyan]{variant.name}[/] -> {variant.config.output.dir}")
+        result = run_generation(variant.config)
+        console.print(f"  {result.pages} pages")
+    console.print(
+        "[green]Done.[/] Train the same model on each arm and compare on a held-out "
+        "*real* benchmark - a synthetic test set would reward the generator's own biases."
+    )
+
+
 @app.command("show-config")
 def show_config(config: Path = _CONFIG_OPTION, set_: list[str] = _SET_OPTION) -> None:
     """Print the fully resolved configuration."""

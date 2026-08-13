@@ -277,3 +277,79 @@ class TestRunGeneration:
             return [json.loads(line)["page"] for line in path.read_text(encoding="utf-8").splitlines()]
 
         assert records(first) == records(second)
+
+
+class TestReadingDirection:
+    """The page must read in the same direction as its text.
+
+    With `text.direction: auto` the configured direction is None, and defaulting the
+    *page spec* to left-to-right ordered the columns left-first while the text inside them
+    ran right-to-left — so an Arabic newspaper was laid out to be read in the wrong order.
+    Nothing raised; the pixels looked plausible and the reading order was simply wrong.
+    """
+
+    ARABIC = [
+        "المغرب بلد يقع في شمال إفريقيا ويطل على المحيط الأطلسي والبحر الأبيض المتوسط.",
+        "تهدف أطلسيا إلى بناء نماذج ذكاء اصطناعي مفتوحة المصدر للغة الدارجة المغربية.",
+        "يحتوي هذا التقرير على جداول وأرقام ومعلومات إضافية مفيدة للقارئ المهتم جدا.",
+    ]
+
+    def _multi_column(self, tmp_path, direction="auto"):
+        return GenerationConfig.model_validate(
+            {
+                "seed": 20260813,
+                "fonts": {"paths": [str(FONT_DIR)], "include": ["NotoSansArabic-"], "size_range": [15, 16]},
+                "text": {"source": {"type": "inline", "sentences": self.ARABIC}, "direction": direction},
+                "page": {
+                    "papers": {"a4": 1.0},
+                    "dpi_range": [110, 110],
+                    "columns": {2: 1.0},
+                    "max_pages": 1,
+                    "header_probability": 0.0,
+                    "footer_probability": 0.0,
+                },
+                "templates": {"weights": {"newspaper": 1.0}},
+                "degradations": {"presets": {"clean": 1.0}},
+                "output": {"dir": str(tmp_path)},
+            }
+        )
+
+    def _first_body_region(self, sample):
+        from ocrsmith.domain import RegionType
+
+        furniture = {RegionType.HEADER, RegionType.FOOTER, RegionType.PAGE_NUMBER}
+        return next(r for r in sample.page.ordered_regions() if r.type not in furniture)
+
+    def test_auto_direction_reads_arabic_columns_right_first(self, tmp_path):
+        config = self._multi_column(tmp_path, direction="auto")
+
+        sample = next(iter(SampleFactory(config).create(0)))
+
+        assert sample.page.direction.value == "rtl"
+        first = self._first_body_region(sample)
+        assert first.bbox.center[0] > sample.page.width / 2, "an Arabic page must start on the right"
+
+    def test_explicit_rtl_agrees_with_auto(self, tmp_path):
+        auto = next(iter(SampleFactory(self._multi_column(tmp_path, "auto")).create(0)))
+        explicit = next(iter(SampleFactory(self._multi_column(tmp_path, "rtl")).create(0)))
+
+        assert self._first_body_region(auto).bbox.center[0] == pytest.approx(
+            self._first_body_region(explicit).bbox.center[0]
+        )
+
+    def test_forcing_ltr_reads_left_first(self, tmp_path):
+        config = self._multi_column(tmp_path, direction="ltr")
+
+        sample = next(iter(SampleFactory(config).create(0)))
+
+        first = self._first_body_region(sample)
+        assert first.bbox.center[0] < sample.page.width / 2
+
+    def test_both_columns_are_used(self, tmp_path):
+        config = self._multi_column(tmp_path, direction="auto")
+
+        sample = next(iter(SampleFactory(config).create(0)))
+
+        centres = [r.bbox.center[0] for r in sample.page.regions]
+        midpoint = sample.page.width / 2
+        assert any(c > midpoint for c in centres) and any(c < midpoint for c in centres)

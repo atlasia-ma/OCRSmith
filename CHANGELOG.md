@@ -4,6 +4,38 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-13
+
+### Added
+
+- **`ocrsmith.validation`** — the two claims the rest of the project only asserted, made
+  measurable.
+  - `ocrsmith compare <synthetic> <real>` measures the sim-to-real gap feature by feature
+    across ten properties (ink fraction, stroke width, contrast, edge density,
+    high-frequency energy, JPEG block noise, illumination range, …). Every feature maps
+    onto a generator knob, so the report says **what to change** — "stroke_width is 22%
+    lower, widen the weight distribution or raise ink spread" — rather than reporting an
+    abstract divergence. Reports both a signed effect size and a distribution overlap,
+    because a corpus can have the right mean and the wrong spread and a mean-only measure
+    would call that a match.
+  - `ocrsmith ablate <name>` builds the corpora that answer "does this feature actually
+    help?". Arms differ in exactly one knob and **share the base seed**, so a downstream
+    accuracy difference can only be attributed to that knob — if the arms drew different
+    text, the experiment would answer nothing. Presets for degradations, fonts, layout and
+    diacritics. Training is deliberately left to the caller.
+
+## [1.1.1] - 2026-08-13
+
+### Fixed
+
+- **An Arabic page with more than one column was laid out to be read in the wrong order.**
+  With the default `text.direction: auto`, the configured direction is `None`; the text
+  still came out right-to-left from the content, but the *page spec* fell back to
+  left-to-right, so `column_boxes()` ordered the columns left-first. The result was a page
+  whose text ran right-to-left inside columns that were read left-to-right. Nothing
+  raised, the pixels looked plausible, and only the reading order was wrong. The page spec
+  now follows the content's direction when none is configured.
+
 ## [1.1.0] - 2026-08-13
 
 Six tracks of work chosen from a survey of what the current OCR literature says synthetic
@@ -278,6 +310,8 @@ page before it reaches the dataset.
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
 
+[1.2.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.2.0
+[1.1.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.1.1
 [1.1.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.1.0
 [1.0.2]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.2
 [1.0.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.1
