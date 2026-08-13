@@ -26,6 +26,27 @@ All notable changes to this project are documented here. The format follows
   equivalence is a test rather than a claim: `_axes` must equal the `np.mgrid` it replaced,
   exactly.
 
+### Fixed
+
+- **A page whose body was washed out shipped with a full transcription if any one block
+  survived.** `MinContrast` reduced its per-block measurements with `max()`, so a faded
+  archival page that kept its heading dark passed on the heading's 238 levels of contrast
+  while every paragraph under it sat at the shade of the paper. The label claimed text no
+  reader could recover. It now judges the page by the *fraction* of blocks below the
+  threshold, like `LegibleLineHeight` beside it, and rejects above half.
+
+  The half is measured, not chosen: across 25 documents per preset, the worst `photo`,
+  `scan` and `clean` pages fail on 0.38, 0.25 and 0.25 of their blocks, while faded
+  `archive` pages reach 0.73 and 0.86. The threshold sits in the gap, so it removes
+  unreadable pages without touching legitimately degraded ones.
+
+- **Tables on right-to-left pages were pinned to the left margin.** `_place_table`
+  composited at `column.x0` whatever the direction, while text in the same column ranged
+  right — so an Arabic page put its table against the left edge with every paragraph beside
+  it starting at the right. `direction` was already threaded in for cell content; it now
+  also decides where the block starts. Figures centred and text followed direction; tables
+  were the only block type that ignored it.
+
 ## [1.2.1] - 2026-08-13
 
 Both entries were found by re-running the benchmark after the 1.2.0 fixes, not by a test.

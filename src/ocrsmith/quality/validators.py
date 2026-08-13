@@ -131,9 +131,15 @@ class MinInkCoverage(Validator):
 class MinContrast(Validator):
     """Text that cannot be distinguished from its background is unreadable ground truth."""
 
-    def __init__(self, min_difference: float = 25.0, max_regions: int = 12):
+    def __init__(
+        self,
+        min_difference: float = 25.0,
+        max_regions: int = 12,
+        max_failing_fraction: float = 0.5,
+    ):
         self.min_difference = min_difference
         self.max_regions = max_regions
+        self.max_failing_fraction = max_failing_fraction
 
     def check(self, sample: Sample) -> Verdict:
         grey = np.asarray(sample.image.convert("L"), dtype=np.float32)
@@ -152,10 +158,18 @@ class MinContrast(Validator):
             differences.append(float(paper - ink))
         if not differences:
             return self._ok()
-        best = max(differences)
-        if best < self.min_difference:
-            return self._fail(f"text stands out from its background by only {best:.1f} levels", best)
-        return self._ok(best)
+        # Judged per block, not by the best one on the page. A faded scan often keeps its
+        # heading dark while every body block washes out; taking the maximum let that page
+        # through carrying a full transcription of text no reader could recover.
+        failing = sum(1 for d in differences if d < self.min_difference) / len(differences)
+        if failing > self.max_failing_fraction:
+            worst = min(differences)
+            return self._fail(
+                f"{failing:.0%} of text blocks stand out from their background by under "
+                f"{self.min_difference:g} levels (worst {worst:.1f})",
+                failing,
+            )
+        return self._ok(failing)
 
 
 class BoxesInsidePage(Validator):
