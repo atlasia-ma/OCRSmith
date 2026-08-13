@@ -18,7 +18,9 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from .charts import ChartKind, sample_chart
 from .content import DocumentBuilder, DocumentContent
+from .formulas import sample_formula
 from .text_source import TextProvider
 
 __all__ = [
@@ -28,6 +30,7 @@ __all__ = [
     "InvoiceTemplate",
     "LetterTemplate",
     "NewspaperTemplate",
+    "PaperTemplate",
     "ReportTemplate",
     "TemplateRegistry",
     "default_registry",
@@ -80,7 +83,15 @@ class ReportTemplate:
         builder.table(_sample_table(source, rng))
         builder.caption(source.phrase(rng, 6))
         builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
-        if rng.random() < 0.5:
+        if rng.random() < 0.55:
+            labels = [source.phrase(rng, 1) for _ in range(4)]
+            builder.chart(
+                sample_chart(rng, labels, title=source.phrase(rng, 3)),
+                width=rng.randint(260, 420),
+                height=rng.randint(190, 300),
+            )
+            builder.caption(source.phrase(rng, 5))
+        elif rng.random() < 0.5:
             builder.figure(width=rng.randint(240, 420), height=rng.randint(160, 300))
             builder.caption(source.phrase(rng, 5))
         builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
@@ -155,6 +166,42 @@ class InvoiceTemplate:
         builder.table(rows)
         builder.key_values([(source.phrase(rng, 1), f"{rng.randint(100, 99999)}.00")])
         builder.paragraph(source.paragraph(rng, 2))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class PaperTemplate:
+    """An academic paper: prose interleaved with displayed equations.
+
+    Formula conversion is the largest gain category in the document-parsing benchmarks,
+    and it needs formulas *in context* - a page of nothing but equations is not what a
+    model meets in the wild.
+    """
+
+    name: str = "paper"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.title(rng))
+        builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        for _ in range(rng.randint(2, 4)):
+            builder.heading(source.title(rng))
+            builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+            builder.formula(sample_formula(rng))
+            if rng.random() < 0.4:
+                builder.paragraph(source.paragraph(rng, 2))
+        if rng.random() < 0.5:
+            builder.chart(
+                sample_chart(
+                    rng,
+                    [source.phrase(rng, 1) for _ in range(4)],
+                    title=source.phrase(rng, 3),
+                    kind=ChartKind.LINE,
+                ),
+                width=rng.randint(240, 400),
+                height=rng.randint(170, 260),
+            )
+            builder.caption(source.phrase(rng, 5))
         return builder.build()
 
 
@@ -234,6 +281,7 @@ def default_registry() -> TemplateRegistry:
         .register(ArticleTemplate(), weight=3.0)
         .register(ReportTemplate(), weight=2.0)
         .register(NewspaperTemplate(), weight=1.5)
+        .register(PaperTemplate(), weight=1.5)
         .register(LetterTemplate(), weight=1.0)
         .register(FormTemplate(), weight=1.0)
         .register(InvoiceTemplate(), weight=1.0)

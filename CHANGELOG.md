@@ -8,6 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Charts with their data** (`ocrsmith.core.documents.charts`). Chart-to-JSON is a
+  first-class task in the Arabic document benchmarks and no synthetic generator covered it.
+  Bar, horizontal-bar, line and pie charts are drawn *from* their series values, so the
+  JSON ground truth cannot drift from the picture. Axis and title labels are real
+  annotated text, so a chart supervises recognition and detection as well.
+- **Formulas typeset from a tree** (`ocrsmith.core.documents.formulas`). Formula
+  conversion is the largest gain category in the document-parsing benchmarks, and a
+  `FORMULA` region previously rendered as plain text. A small typesetter handles
+  fractions, powers, indices, radicals and sums/integrals with limits, positioned on a
+  baseline — and emits the LaTeX from the same tree, so the two cannot disagree. No LaTeX
+  toolchain required.
+  - `choose_math_font` applies glyph coverage to mathematics: most text faces have no
+    summation sign, and choosing blindly produced a formula of empty boxes whose LaTeX
+    confidently asserted a sum.
+- `RegionType.CHART`, `DocumentBuilder.chart()` / `.formula()`, and a `paper` template
+  that interleaves prose with displayed equations. Chart JSON and formula LaTeX both reach
+  the Markdown ground truth.
+
 - **Physical degradations** (`ocrsmith.core.degradations.physical`). Rendering-based
   synthesis produces a page lying perfectly flat under perfectly uniform light; real
   captures never do, and modelling the difference is worth several points on documents

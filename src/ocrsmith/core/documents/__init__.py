@@ -1,7 +1,9 @@
 """Document generation: content models, page geometry, typography and flow layout."""
 
+from .charts import Chart, ChartKind, ChartRenderer, ChartSeries, sample_chart
 from .content import ContentBlock, DocumentBuilder, DocumentContent
 from .flow import DocumentRenderer, RenderedPage
+from .formulas import FormulaRenderer, choose_math_font, sample_formula
 from .page_spec import PAPER_SIZES_MM, PageSpec
 from .table_renderer import BorderStyle, RenderedTable, TableRenderer, TableStyle
 from .templates import (
@@ -11,6 +13,7 @@ from .templates import (
     InvoiceTemplate,
     LetterTemplate,
     NewspaperTemplate,
+    PaperTemplate,
     ReportTemplate,
     TemplateRegistry,
     default_registry,
@@ -27,6 +30,11 @@ from .typography import (
 __all__ = [
     "PAPER_SIZES_MM",
     "ArticleTemplate",
+    "Chart",
+    "ChartKind",
+    "ChartRenderer",
+    "ChartSeries",
+    "FormulaRenderer",
     "BorderStyle",
     "ContentBlock",
     "CorpusTextProvider",
@@ -39,6 +47,7 @@ __all__ = [
     "InvoiceTemplate",
     "LetterTemplate",
     "NewspaperTemplate",
+    "PaperTemplate",
     "PageSpec",
     "RenderedPage",
     "RenderedTable",
@@ -50,6 +59,9 @@ __all__ = [
     "TextProvider",
     "Typography",
     "TypographySampler",
+    "choose_math_font",
     "default_registry",
+    "sample_chart",
+    "sample_formula",
     "group_font_families",
 ]

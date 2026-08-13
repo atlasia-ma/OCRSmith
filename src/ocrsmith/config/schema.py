@@ -178,6 +178,7 @@ class TemplateConfig(BaseModel):
             "article": 3.0,
             "report": 2.0,
             "newspaper": 1.5,
+            "paper": 1.5,
             "letter": 1.0,
             "form": 1.0,
             "invoice": 1.0,

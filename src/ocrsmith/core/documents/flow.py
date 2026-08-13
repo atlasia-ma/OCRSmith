@@ -28,7 +28,9 @@ from ..rendering.metrics import metrics_for
 from ..rendering.style import Alignment
 from ..rendering.text_renderer import TextBlockRenderer
 from ..rendering.wrapping import wrap_paragraph
+from .charts import ChartRenderer
 from .content import ContentBlock, DocumentContent
+from .formulas import FormulaRenderer, choose_math_font
 from .page_spec import PageSpec
 from .table_renderer import RenderedTable, TableRenderer, TableStyle
 from .typography import Typography
@@ -59,9 +61,11 @@ class DocumentRenderer:
         self,
         text_renderer: TextBlockRenderer | None = None,
         table_renderer: TableRenderer | None = None,
+        chart_renderer: ChartRenderer | None = None,
     ):
         self.text_renderer = text_renderer or TextBlockRenderer()
         self.table_renderer = table_renderer or TableRenderer(self.text_renderer)
+        self.chart_renderer = chart_renderer or ChartRenderer(self.text_renderer)
 
     def render(
         self,
@@ -252,6 +256,10 @@ class DocumentRenderer:
 
         if block.type is RegionType.SEPARATOR:
             placement = self._place_rule(image, column, top, role, available)
+        elif block.type is RegionType.CHART and block.attributes.get("chart") is not None:
+            placement = self._place_chart(image, block, column, top, available, role, direction, rng)
+        elif block.type is RegionType.FORMULA and block.attributes.get("node") is not None:
+            placement = self._place_formula(image, block, column, top, available, role)
         elif block.type is RegionType.FIGURE:
             placement = self._place_figure(image, block, column, top, available, role)
         elif block.type is RegionType.TABLE and block.table is not None:
@@ -355,6 +363,64 @@ class DocumentRenderer:
         # what they depict, and inventing imagery would be pretending to data we lack.
         draw.rectangle(box.as_int(), outline=(120, 120, 120, 255), fill=(238, 238, 240, 255), width=2)
         region = Region(RegionType.FIGURE, box, (), None, 0, dict(block.attributes))
+        return (region, height + role.space_after, None)
+
+    def _place_chart(
+        self, image, block, column, top, available, role, direction, rng
+    ) -> tuple[Region | None, float, ContentBlock | None] | None:
+        """Draw a chart. Its labels are real text, annotated like any other text."""
+        width = min(float(block.attributes.get("width", column.width)), column.width)
+        height = float(block.attributes.get("height", width * 0.7))
+        if height > available:
+            return None
+
+        rendered = self.chart_renderer.render(
+            block.attributes["chart"],
+            role.font,
+            width=int(width),
+            height=int(height),
+            direction=direction,
+            rng=rng,
+        )
+        x = column.x0 + (column.width - width) / 2
+        image.alpha_composite(rendered.image, (int(round(x)), int(round(top))))
+        placed = rendered.translated(x, top)
+        box = BBox(x, top, x + width, top + height)
+        region = Region(
+            RegionType.CHART,
+            box,
+            placed.lines,
+            None,
+            0,
+            {**{k: v for k, v in block.attributes.items() if k != "chart"}, "chart": placed.chart.to_dict()},
+        )
+        return (region, height + role.space_after, None)
+
+    def _place_formula(
+        self, image, block, column, top, available, role
+    ) -> tuple[Region | None, float, ContentBlock | None] | None:
+        """Typeset a formula. The LaTeX travels in the region attributes."""
+        renderer = FormulaRenderer(
+            choose_math_font([role.font.path], fallback=str(role.font.path)),
+            size=max(12, int(getattr(role.font, "size", 24) * 1.15)),
+            ink=role.style.color,
+        )
+        rendered = renderer.render(block.attributes["node"])
+        width, height = rendered.size
+        if height > available or width > column.width * 1.6:
+            return None
+
+        x = column.x0 + max(0.0, (column.width - width) / 2)
+        image.alpha_composite(rendered.image, (int(round(x)), int(round(top))))
+        box = BBox(x, top, x + width, top + height)
+        region = Region(
+            RegionType.FORMULA,
+            box,
+            (),
+            None,
+            0,
+            {**block.attributes, "latex": rendered.latex, "node": None},
+        )
         return (region, height + role.space_after, None)
 
     def _place_rule(

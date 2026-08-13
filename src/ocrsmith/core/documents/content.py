@@ -108,8 +108,27 @@ class DocumentBuilder:
     def code(self, text: str, **attributes) -> DocumentBuilder:
         return self._add(RegionType.CODE, text, attributes)
 
-    def formula(self, latex: str, **attributes) -> DocumentBuilder:
-        return self._add(RegionType.FORMULA, latex, attributes)
+    def formula(self, node, **attributes) -> DocumentBuilder:
+        """Add a formula from an expression tree; its LaTeX becomes the ground truth."""
+        latex = node.latex() if hasattr(node, "latex") else str(node)
+        self._blocks.append(
+            ContentBlock(
+                RegionType.FORMULA,
+                text=latex,
+                attributes={"latex": latex, "node": node, **attributes},
+            )
+        )
+        return self
+
+    def chart(self, chart, width: int = 420, height: int = 300, **attributes) -> DocumentBuilder:
+        """Add a chart. Its data is the ground truth; the drawing is derived from it."""
+        self._blocks.append(
+            ContentBlock(
+                RegionType.CHART,
+                attributes={"chart": chart, "width": width, "height": height, **attributes},
+            )
+        )
+        return self
 
     def header(self, text: str, **attributes) -> DocumentBuilder:
         return self._add(RegionType.HEADER, text, attributes)
