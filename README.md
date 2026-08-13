@@ -257,6 +257,35 @@ ocrsmith preview --set run.start_index=8412 --count 1 --boxes
 ocrsmith generate -n 1000000 --workers 32 --format webdataset -o /mnt/data/ocr
 ```
 
+## Validating the corpus
+
+The sim-to-real gap is usually answered with an assertion. Measure it instead:
+
+```bash
+ocrsmith compare data/train/images /path/to/real/scans -m gap.md
+```
+
+Ten features, each mapping onto a generator knob, so the report names **what to change**:
+
+| feature | synthetic | real | gap | overlap | verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `high_frequency_energy` | 20.6 | 14.3 | +44% | 25% | mismatched |
+| `stroke_width` | 5.37 | 6.84 | -22% | 50% | mismatched |
+| `illumination_range` | 209 | 208 | +1% | 50% | matched |
+
+> `high_frequency_energy` is synthetic higher (+44%) — Blur, Downscale and GaussianNoise strength
+> `stroke_width` is synthetic lower (-22%) — font weight distribution, InkSpread / InkErosion probability
+
+And when you add a feature, measure whether it helps rather than assuming:
+
+```bash
+ocrsmith ablate degradations --generate -n 20000
+```
+
+Every arm shares the base seed, so the arms differ in exactly the knob under test.
+Train the same model on each and compare on a held-out **real** benchmark — a synthetic
+test set would only reward the generator's own biases.
+
 ## Evaluating a model on it
 
 ```bash
