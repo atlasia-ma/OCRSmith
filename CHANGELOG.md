@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [1.1.0] - 2026-08-13
 
+Six tracks of work chosen from a survey of what the current OCR literature says synthetic
+data is missing, and from the limitations AtlasOCR — trained on OCRSmith output — reports
+about itself.
+
 ### Added
 
 - **Non-prose corpus content.** A sentence corpus contains no dates, no reference numbers

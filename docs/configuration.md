@@ -20,6 +20,11 @@ so any sample is reproducible on its own. `null` means non-reproducible.
 
 ## `fonts`
 
+Run `ocrsmith fetch-fonts --subset arabic` first: it downloads 57 open-licensed families
+(with their licences and a reproducibility manifest) and takes the pool from 11 families
+to 57, or 101 to 381 drawable faces once variable fonts are expanded into their named
+instances.
+
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `paths` | `["assets/fonts"]` | Files or directories to search for `.ttf`/`.otf`/`.ttc`. |
@@ -43,6 +48,20 @@ blank or a tofu box while the label still claims the character.
 | `split`, `name` | Hugging Face split and configuration. |
 | `limit` | Stop after this many rows — useful for smoke runs. |
 | `sentences` | Used by `inline`, and as the fallback if a source yields nothing. |
+
+### `text.diacritics`
+
+Real Arabic is *partially* diacritised and the proportion varies by genre. Marks are only
+ever **removed**, never invented — diacritising bare text needs a diacritiser model and
+would make the label assert vowels nobody wrote.
+
+| Key | Meaning |
+| --- | --- |
+| `mode` | `keep`, `strip`, `partial`, or `mixed` (sampled per document). |
+| `keep_range` | Fraction of marks kept, for `partial`. |
+| `mixed_weights` | Weights for fully marked / partially marked / bare. |
+
+Point `text.source` at a diacritised corpus and let the policy vary it downwards.
 
 ### `text.normalization`
 
@@ -87,8 +106,16 @@ not. Decide deliberately.
 
 ## `templates.weights`
 
-`article`, `report`, `newspaper`, `letter`, `form`, `invoice`. Set a weight to `0` to
-exclude a genre.
+`article`, `report`, `newspaper`, `paper`, `letter`, `form`, `invoice`, `contents`,
+`slide`, `notes`. Set a weight to `0` to exclude a genre.
+
+| Genre | Covers |
+| --- | --- |
+| `paper` | Displayed equations in prose (LaTeX ground truth) |
+| `report` | Tables and charts with captions (chart-to-JSON ground truth) |
+| `contents` | Dot leaders — runs of identical glyphs models miscount |
+| `slide` | Very large type, very little of it |
+| `notes` | Handwriting-style setting for the handwriting-heavy Arabic benchmarks |
 
 ## `degradations.presets`
 
@@ -98,7 +125,11 @@ exclude a genre.
 | `scan` | Flatbed: slight skew, paper texture, toner spread, mild compression. |
 | `photo` | Phone: perspective, uneven light, glare, motion blur, heavy JPEG. |
 | `fax` | Low resolution, high contrast, broken strokes. |
-| `archive` | Aged paper: stains, folds, bleed-through, faded contrast. |
+| `archive` | Aged paper: stains, folds, wrinkles, bleed-through, faded contrast. |
+
+`photo` and `archive` model **physical deformation** — page curl, wrinkles and uneven
+illumination fields — not just colour transforms. The deformations carry the annotation
+through the same displacement field, so boxes track the ink.
 
 Keeping a share of `clean` is useful for curriculum training — start easy, then degrade.
 
