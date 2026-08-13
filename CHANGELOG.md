@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-08-13
+
+Both entries were found by re-running the benchmark after the 1.2.0 fixes, not by a test.
+Neither raised anything: one reported success with no output, the other ran a job at a
+fraction of the requested parallelism. They are the same kind of defect the rest of this
+project exists to prevent — a wrong result that looks like a right one.
+
+### Fixed
+
+- **A parallel run whose every shard died reported success with zero pages.** Worker
+  exceptions were collapsed into a bare counter and the exceptions themselves discarded,
+  so `run_generation` returned a success-shaped result and the only surviving evidence was
+  a number. `GenerationResult.shard_errors` now records `(shard, reason)` for every shard
+  that died, the CLI prints each one, and a run where every shard failed and nothing was
+  written raises instead of returning. Serial and parallel paths previously disagreed —
+  serial propagated, parallel swallowed — and now share one seam.
+
+### Added
+
+- **`generate` says when `output.shard_size` is capping parallelism.** A shard is the unit
+  of parallelism, so 400 documents in 250-document shards is two shards and therefore two
+  processes however many workers were asked for. Measured: 4 workers over 2 shards gave a
+  1.6x speedup; the same work over 8 shards gave 3.2x, and 12 workers over 16 shards gave
+  5.3x. The only symptom of the capped case is that the job finishes late, so the advice —
+  including the `shard_size` that would use every worker — is printed before the run.
+- Scaling table, the `shard_size ≈ num_samples / workers` rule of thumb and the ~210 MB
+  per-worker memory budget in the README.
+- A test for a claim that had been resting on an argument: that the worker count does not
+  change the dataset. Verified against real worker processes, record by record.
+
 ## [1.2.0] - 2026-08-13
 
 ### Added

@@ -29,4 +29,4 @@ __all__ = [
     "run_generation",
 ]
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
