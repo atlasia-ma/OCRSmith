@@ -159,7 +159,16 @@ class SampleFactory:
         )
 
     def _typography(self, content, rng: random.Random):
-        faces = self.fonts.supporting(content.text[:2000]) or self.fonts.faces
+        # Probe against everything the page will draw - table cells and list items
+        # included - and against the *shaped* form, which is what actually reaches the
+        # rasteriser.
+        probe = content.all_text[:4000]
+        faces = self.fonts.supporting(probe)
+        if not faces:
+            # Falling back to the whole pool would hand the document a face that cannot
+            # draw its script at all, which is the exact failure coverage exists to
+            # prevent. Fall back to the best face instead, and only that one.
+            faces = (self.fonts.choose(probe, rng),)
         sampler = TypographySampler(faces, body_size_range=tuple(self.config.fonts.size_range))
         return sampler.sample(rng)
 
