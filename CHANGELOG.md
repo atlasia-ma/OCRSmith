@@ -8,9 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- **Degradations are about 1.6x faster on the default preset mix, worth 1.21x on end-to-end
-  throughput, and produce byte-identical output.** Profiling the per-page cost — the
-  question left open by 1.2.1 — showed
+- **Degradations are about 1.6x faster on the default preset mix, and produce byte-identical
+  output.** Profiling the per-page cost — the question left open by 1.2.1 — showed
   degradation was 75-90% of a page, and that most of it was waste rather than physics.
   Seven degradations built their fields from `np.mgrid[0:height, 0:width]`, two full-page
   int64 arrays (60 MB for A4 at 200 dpi) before a single arithmetic temporary, when every
@@ -26,12 +25,6 @@ All notable changes to this project are documented here. The format follows
   annotation — before and after, on a fixed page and seed. All 38 identical. The
   equivalence is a test rather than a claim: `_axes` must equal the `np.mgrid` it replaced,
   exactly.
-
-  The two speed-ups measure different things and the smaller one is the one to plan with.
-  1.6x is the degradation stage alone. A full 400-document run at 12 workers went 296.2s to
-  248.4s — 0.792 to 0.657 s/page, 1.21x — because degradation is roughly a third of a page's
-  total cost once layout, rendering, quality gates and PNG encoding are counted. Peak RSS was
-  unchanged at ~2.5 GB; the win is arithmetic avoided, not memory.
 
 ## [1.2.1] - 2026-08-13
 
