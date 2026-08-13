@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Physical degradations** (`ocrsmith.core.degradations.physical`). Rendering-based
+  synthesis produces a page lying perfectly flat under perfectly uniform light; real
+  captures never do, and modelling the difference is worth several points on documents
+  photographed in the wild.
+  - `Wrinkles` — local displacement plus the shading its ridges catch.
+  - `PageCurl` — a bound page bending away from the sensor, compressing text towards one
+    edge and darkening into the gutter. Flat perspective warping cannot produce this.
+  - `IlluminationField` — smooth, arbitrary lighting, distinct from `Shadow` (a linear
+    ramp) and `Vignette` (radial and centred).
+
+  All three are displacement or field effects rather than colour transforms, and the
+  deformations carry the annotation through the same field — verified by measuring where
+  the ink actually landed and requiring the boxes to be there (IoU > 0.85).
+
+  The `photo` and `archive` presets now use them.
+
 - **Diacritics control** (`ocrsmith.text.diacritics`). Arabic OCR handles vocalisation
   badly, and it is the first limitation AtlasOCR reports about itself. The cause is
   distributional: real Arabic is *partially* diacritised, and the proportion varies by
