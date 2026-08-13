@@ -78,6 +78,8 @@ def generate(
         console.print(f"[yellow]Skipped {len(result.skipped_shards)} already-complete shard(s).[/]")
     if result.failures:
         console.print(f"[red]{result.failures} shard(s) failed.[/]")
+        for index, reason in result.shard_errors:
+            console.print(f"  [red]shard {index}:[/] {reason}")
         raise typer.Exit(code=1)
 
 

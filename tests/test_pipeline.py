@@ -19,6 +19,7 @@ from ocrsmith.pipeline import (
     plan_shards,
     run_generation,
     run_shard,
+    runner,
 )
 from ocrsmith.pipeline.runner import ShardPlan
 
@@ -277,6 +278,63 @@ class TestRunGeneration:
             return [json.loads(line)["page"] for line in path.read_text(encoding="utf-8").splitlines()]
 
         assert records(first) == records(second)
+
+
+class TestShardFailures:
+    """A shard that dies must say why, and a run that produces nothing must not look fine.
+
+    Found by a benchmark, not by a test: a parallel run reported success with zero pages
+    and no reason, because every worker exception was swallowed into a bare counter. The
+    cause was in the caller, but the pipeline destroyed the only evidence that would have
+    identified it in seconds rather than in an hour.
+    """
+
+    def test_a_run_that_produces_nothing_raises(self, tmp_path, monkeypatch):
+        config = make_config(tmp_path, run={"num_samples": 4, "workers": 1}, output={"shard_size": 2})
+
+        def explode(_config, _plan):
+            raise RuntimeError("disk on fire")
+
+        monkeypatch.setattr(runner, "_run_one", explode)
+
+        with pytest.raises(RuntimeError, match="disk on fire"):
+            run_generation(config)
+
+    def test_a_partial_failure_keeps_the_good_shards_and_the_reason(self, tmp_path, monkeypatch):
+        config = make_config(tmp_path, run={"num_samples": 4, "workers": 1}, output={"shard_size": 2})
+        real = runner._run_one
+
+        def flaky(config_, plan):
+            if plan.index == 1:
+                raise RuntimeError("disk on fire")
+            return real(config_, plan)
+
+        monkeypatch.setattr(runner, "_run_one", flaky)
+
+        result = run_generation(config)
+
+        assert result.pages > 0, "a healthy shard must still be written"
+        assert result.failures == 1
+        assert "disk on fire" in dict(result.shard_errors)[1]
+
+    def test_a_clean_run_reports_no_errors(self, tmp_path):
+        result = run_generation(make_config(tmp_path))
+
+        assert result.failures == 0
+        assert result.shard_errors == ()
+
+    def test_the_errors_serialise(self, tmp_path, monkeypatch):
+        config = make_config(tmp_path, run={"num_samples": 4, "workers": 1}, output={"shard_size": 2})
+        real = runner._run_one
+        monkeypatch.setattr(
+            runner,
+            "_run_one",
+            lambda c, p: (_ for _ in ()).throw(RuntimeError("nope")) if p.index else real(c, p),
+        )
+
+        payload = json.loads(json.dumps(run_generation(config).to_dict()))
+
+        assert payload["shard_errors"][0][0] == 1
 
 
 class TestReadingDirection:
