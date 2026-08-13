@@ -152,6 +152,38 @@ class TestMinContrast:
 
         assert not MinContrast().check(sample).passed
 
+    def test_rejects_a_block_whose_only_variation_is_fold_shading(self):
+        """A fold crossing a block varies its brightness without any ink surviving.
+
+        Measured as a percentile spread over the block, that shading read as strong
+        contrast — an erased paragraph under a fold scored higher than a heading that was
+        still perfectly readable, and the page shipped with a full transcription.
+        """
+        image = Image.new("RGB", (320, 120), (250, 248, 244))
+        draw = ImageDraw.Draw(image)
+        box = BBox(20, 20, 300, 100)
+        # Across the whole page, as a fold falls: a band that stopped at the block's edge
+        # would be a step, and a step is exactly what ink looks like.
+        for x in range(image.width):
+            shade = int(120 + 120 * x / image.width)
+            draw.line((x, 0, x, image.height), fill=(shade, shade, shade))
+        words = (Word("كلمة", box),)
+        region = Region(RegionType.PARAGRAPH, box, (Line("كلمة", box, words, Direction.RTL),), None, 0)
+        sample = Sample(
+            id="00000001_01",
+            image=image,
+            page=Page(320, 120, (region,), Direction.RTL),
+            provenance=Provenance(
+                seed=1,
+                template="article",
+                background="paper",
+                font_path="assets/fonts/X-Regular.ttf",
+                extra={"index": 1, "page": 1, "preset": "archive"},
+            ),
+        )
+
+        assert not MinContrast().check(sample).passed
+
     def test_accepts_a_page_where_only_one_block_faded(self):
         dark, faded = (10, 10, 10), (246, 244, 240)
         sample = build_banded_sample((dark, dark, dark, faded))

@@ -35,10 +35,22 @@ All notable changes to this project are documented here. The format follows
   reader could recover. It now judges the page by the *fraction* of blocks below the
   threshold, like `LegibleLineHeight` beside it, and rejects above half.
 
-  The half is measured, not chosen: across 25 documents per preset, the worst `photo`,
-  `scan` and `clean` pages fail on 0.38, 0.25 and 0.25 of their blocks, while faded
-  `archive` pages reach 0.73 and 0.86. The threshold sits in the gap, so it removes
-  unreadable pages without touching legitimately degraded ones.
+  That alone changed nothing, because the quantity being reduced was also wrong. Contrast
+  was a 10-90 percentile spread taken across a block, which measures whatever varies within
+  it — and on a folded, stained page what varies is the shading. Text presence barely
+  entered: on one page an erased caption scored 60.0 and a perfectly readable heading 61.9.
+  Every block cleared the threshold and the page passed with nothing failing.
+
+  Contrast is now measured at stroke scale — how far ink falls below the paper immediately
+  around it, taking the local paper level from a dilation by roughly a stroke's width.
+  Smooth shading subtracts out by construction. On that same page the readable heading
+  moves to 205.2 and the erased caption to 36.0, a gap the old measure inverted. A `clean`
+  page scores 214-239 on every block at 110, 200 and 300 dpi, so the window needs no
+  scaling.
+
+  The threshold follows from that scale: at 90, `clean`, `scan` and `fax` lose nothing,
+  `photo` loses 2.9%, and `archive` loses the 25.7% of its pages that are unreadable. At
+  120 it would start discarding a fifth of `photo`, which is dark but perfectly legible.
 
 - **Tables on right-to-left pages were pinned to the left margin.** `_place_table`
   composited at `column.x0` whatever the direction, while text in the same column ranged
