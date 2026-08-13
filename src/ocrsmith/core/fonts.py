@@ -13,6 +13,7 @@ from __future__ import annotations
 import random
 import threading
 from collections.abc import Iterable, Sequence
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import ImageFont
@@ -21,27 +22,45 @@ from PIL.ImageFont import FreeTypeFont
 from ..text.coverage import fonts_supporting, supports_text
 from ..text.shaping import TextShaper, resolve_shaper
 
-__all__ = ["FontPool", "clear_font_cache", "discover_fonts", "load_font"]
+__all__ = ["FontPool", "clear_font_cache", "discover_fonts", "font_variations", "load_font"]
 
 _FONT_EXTENSIONS = {".ttf", ".otf", ".ttc"}
-_cache: dict[tuple[str, int], FreeTypeFont] = {}
+_cache: dict[tuple[str, int, str], FreeTypeFont] = {}
 _cache_lock = threading.Lock()
 
 
-def load_font(path: str | Path, size: int) -> FreeTypeFont:
-    """Load a font face, reusing an already-instantiated one when possible."""
-    key = (str(path), int(size))
+def load_font(path: str | Path, size: int, variation: str | None = None) -> FreeTypeFont:
+    """Load a font face, reusing an already-instantiated one when possible.
+
+    `variation` selects a named instance of a variable font. Without it a variable font
+    renders only its default instance, which collapses a whole family's weight range onto
+    one face — and roughly half of the Arabic families on Google Fonts are variable.
+    """
+    key = (str(path), int(size), variation or "")
     with _cache_lock:
         cached = _cache.get(key)
     if cached is not None:
         return cached
     try:
         font = ImageFont.truetype(str(path), size=int(size))
+        if variation:
+            font.set_variation_by_name(variation)
     except OSError as exc:
         raise ValueError(f"Unable to load font from {path!r}: {exc}") from exc
     with _cache_lock:
         _cache[key] = font
     return font
+
+
+@lru_cache(maxsize=1024)
+def font_variations(path: str | Path) -> tuple[str, ...]:
+    """Named instances of a variable font, or an empty tuple for a static one."""
+    try:
+        font = ImageFont.truetype(str(path), size=12)
+        names = font.get_variation_names()
+    except (OSError, AttributeError):
+        return ()
+    return tuple(name.decode("utf-8") if isinstance(name, bytes) else str(name) for name in names)
 
 
 def clear_font_cache() -> None:

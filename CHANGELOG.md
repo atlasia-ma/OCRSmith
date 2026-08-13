@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-13
+
+### Added
+
+- **`ocrsmith fetch-fonts`** — downloads open-licensed families from Google Fonts on
+  demand. Font diversity is the highest-impact lever in synthetic text data, and a
+  repository should not ship other people's typefaces. Only permissively licensed
+  directories of `google/fonts` are used (`ofl`, `apache`, `ufl`), every family's licence
+  file is downloaded beside its fonts, and a manifest records exactly what was taken so a
+  dataset stays reproducible.
+- **Variable-font expansion.** Roughly half the Arabic families on Google Fonts are
+  variable, and a variable font renders only its default instance — so `light`, `regular`
+  and `bold` of such a family all collapsed onto the same face. Families are now expanded
+  into their named instances via `font_variations` / `load_font(..., variation=...)`, and
+  `Face` carries the instance alongside the file.
+- `DocumentContent.all_text`, covering table cells and list items.
+
+Measured on the bundled fonts plus one `fetch-fonts --subset arabic` run:
+**11 -> 57 families, 101 -> 381 drawable faces**, including 13 display and calligraphic
+families of the kind that synthetic corpora usually lack entirely.
+
+Note for non-Raqm builds: only 16 of the 105 fetched files carry Arabic presentation
+forms, so the coverage gate (fixed in 1.0.2) correctly rejects most of them. Installing
+Pillow with Raqm raises the usable pool from 85 to 203 faces.
+
 ## [1.0.2] - 2026-08-13
 
 ### Fixed
@@ -181,6 +206,7 @@ page before it reaches the dataset.
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
 
+[1.1.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.1.0
 [1.0.2]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.2
 [1.0.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.1
 [1.0.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.0

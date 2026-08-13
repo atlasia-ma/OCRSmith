@@ -112,6 +112,58 @@ def preview(
     console.print(f"[green]Wrote {written} preview page(s) to[/] {output_dir}")
 
 
+@app.command("fetch-fonts")
+def fetch_fonts(
+    subset: str = typer.Option("arabic", "--subset", "-s", help="Unicode subset, e.g. arabic, latin."),
+    output_dir: Path = typer.Option(Path("assets/fonts"), "--output", "-o"),
+    limit: int = typer.Option(0, "--limit", "-n", help="Fetch at most this many families (0 = all)."),
+    include_noto: bool = typer.Option(True, "--include-noto/--no-noto"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be fetched."),
+) -> None:
+    """Download open-licensed font families from Google Fonts.
+
+    Font diversity is the highest-impact lever in synthetic text data, and a repository
+    should not ship other people's typefaces. Every family's licence is downloaded
+    alongside it and recorded in a manifest, so a dataset stays reproducible.
+    """
+    from .assets import fetch_families, list_families, write_manifest
+
+    records = list_families(subset)
+    if not include_noto:
+        records = tuple(record for record in records if not record.is_noto)
+    if limit:
+        records = records[:limit]
+
+    console.print(f"[bold]{len(records)}[/] open-licensed families with the [cyan]{subset}[/] subset")
+    if dry_run:
+        table = Table(title="would fetch")
+        table.add_column("family")
+        table.add_column("category")
+        table.add_column("designers")
+        for record in records:
+            table.add_row(record.family, record.category, ", ".join(record.designers)[:44])
+        console.print(table)
+        return
+
+    fetched = []
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total} families"),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("fetching", total=len(records))
+        for record in fetch_families(records, output_dir, on_progress=lambda *_: progress.advance(task)):
+            fetched.append(record)
+        progress.update(task, completed=len(records))
+
+    manifest = write_manifest(output_dir, fetched, subset)
+    files = sum(len(record.files) for record in fetched)
+    console.print(f"[green]Fetched {len(fetched)} families ({files} files) into[/] {output_dir}")
+    console.print(f"Manifest: {manifest}")
+
+
 @app.command()
 def fonts(
     config: Path = _CONFIG_OPTION,

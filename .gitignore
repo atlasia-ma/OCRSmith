@@ -209,3 +209,8 @@ training_data
 assets/text_data
 outputs
 test_output
+
+# Fonts fetched by `ocrsmith fetch-fonts`. Not committed: they are other people's work
+# under their own licences, and the manifest makes a fetch reproducible.
+assets/fonts_google/
+assets/fonts_fetched/
