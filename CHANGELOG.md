@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Diacritics control** (`ocrsmith.text.diacritics`). Arabic OCR handles vocalisation
+  badly, and it is the first limitation AtlasOCR reports about itself. The cause is
+  distributional: real Arabic is *partially* diacritised, and the proportion varies by
+  genre. `DiacriticsPolicy` samples per document across four modes (`keep`, `strip`,
+  `partial`, `mixed`), and records the kept fraction in provenance so a diacritics
+  ablation is possible later. `DatasetStats` reports the corpus split across bare, partial
+  and fully marked pages.
+
+  Marks are only ever **removed**, never invented. Adding vocalisation to bare text needs
+  a diacritiser model and would make the label assert vowels nobody wrote — a fabricated
+  ground truth that looks entirely plausible. Point `text.source` at a diacritised corpus
+  and let the policy vary it downwards.
+
 - **`ocrsmith fetch-fonts`** — downloads open-licensed families from Google Fonts on
   demand. Font diversity is the highest-impact lever in synthetic text data, and a
   repository should not ship other people's typefaces. Only permissively licensed

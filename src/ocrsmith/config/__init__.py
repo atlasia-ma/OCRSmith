@@ -4,6 +4,7 @@ from .loader import DEFAULT_CONFIG_PATH, apply_overrides, load_config
 from .schema import (
     BackgroundConfig,
     DegradationConfig,
+    DiacriticsConfig,
     FontConfig,
     GenerationConfig,
     NormalizationConfig,
@@ -19,6 +20,7 @@ __all__ = [
     "DEFAULT_CONFIG_PATH",
     "BackgroundConfig",
     "DegradationConfig",
+    "DiacriticsConfig",
     "FontConfig",
     "GenerationConfig",
     "NormalizationConfig",

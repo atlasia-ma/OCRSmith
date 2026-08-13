@@ -22,6 +22,22 @@ from ..domain import Sample
 __all__ = ["DatasetStats", "scan_jsonl"]
 
 
+def _vocalisation_bucket(text: str) -> str:
+    """Coarse label for how diacritised a page is.
+
+    Bucketed rather than averaged because the interesting question is compositional - what
+    share of the corpus is bare, partial, or fully marked - not what the mean is.
+    """
+    from ..text.diacritics import diacritic_ratio
+
+    ratio = diacritic_ratio(text)
+    if ratio <= 0.01:
+        return "none"
+    if ratio < 0.35:
+        return "partial"
+    return "full"
+
+
 @dataclass
 class DatasetStats:
     """Streaming counters over a corpus."""
@@ -39,6 +55,8 @@ class DatasetStats:
     fonts: Counter = field(default_factory=Counter)
     characters_seen: Counter = field(default_factory=Counter)
     page_sizes: Counter = field(default_factory=Counter)
+    #: How vocalised each page was, bucketed. Arabic OCR lives or dies on this.
+    diacritics: Counter = field(default_factory=Counter)
     _line_heights: list = field(default_factory=list)
 
     def add(self, sample: Sample) -> DatasetStats:
@@ -59,6 +77,7 @@ class DatasetStats:
         if provenance.font_path:
             self.fonts[Path(provenance.font_path).name] += 1
 
+        self.diacritics[_vocalisation_bucket(page.text)] += 1
         for region in page.regions:
             self.region_types[region.type.value] += 1
         for line in page.iter_lines():
@@ -89,6 +108,7 @@ class DatasetStats:
         if provenance.get("font_path"):
             self.fonts[Path(provenance["font_path"]).name] += 1
 
+        self.diacritics[_vocalisation_bucket(record.get("text", ""))] += 1
         for region in page.get("regions", []):
             self.region_types[region.get("type", "unknown")] += 1
             for line in region.get("lines", []):
@@ -134,6 +154,7 @@ class DatasetStats:
             "directions": dict(self.directions.most_common()),
             "region_types": dict(self.region_types.most_common()),
             "backgrounds": dict(self.backgrounds.most_common()),
+            "vocalisation": dict(self.diacritics.most_common()),
             "top_fonts": dict(self.fonts.most_common(10)),
             "top_page_sizes": dict(self.page_sizes.most_common(5)),
             "rarest_characters": [char for char, _ in self.characters_seen.most_common()[-15:]],
@@ -160,6 +181,7 @@ class DatasetStats:
             ("Capture conditions", "degradation_presets"),
             ("Reading direction", "directions"),
             ("Region types", "region_types"),
+            ("Vocalisation", "vocalisation"),
         ):
             if data[key]:
                 lines.append("")

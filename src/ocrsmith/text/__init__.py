@@ -10,6 +10,14 @@ from .coverage import (
     missing_glyphs,
     supports_text,
 )
+from .diacritics import (
+    DiacriticsMode,
+    DiacriticsPolicy,
+    apply_diacritics,
+    count_diacritics,
+    diacritic_ratio,
+    strip_partial,
+)
 from .normalization import (
     NormalizationPolicy,
     NumeralSystem,
@@ -49,6 +57,13 @@ __all__ = [
     "TransparentShaper",
     "raqm_available",
     "resolve_shaper",
+    # diacritics
+    "DiacriticsMode",
+    "DiacriticsPolicy",
+    "apply_diacritics",
+    "count_diacritics",
+    "diacritic_ratio",
+    "strip_partial",
     # coverage
     "CoverageReport",
     "fonts_supporting",

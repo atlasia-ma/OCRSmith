@@ -30,6 +30,14 @@ text:
       - "يحتوي هذا التقرير على جداول وأرقام ومعلومات إضافية مفيدة للقارئ المهتم."
       - "في سنة 2024 أطلقت المجموعة نموذج OCR جديد يدعم اللغتين العربية والفرنسية."
       - "تعتمد الطريقة المقترحة على توليد بيانات اصطناعية متنوعة وواقعية قدر الإمكان."
+  diacritics:
+    # Marks are only ever removed, never invented: adding them would need a diacritiser
+    # model and would make the label assert vowels nobody wrote. Point this at a
+    # diacritised corpus and use "mixed" to reproduce how real Arabic actually varies -
+    # fully marked religious and pedagogical texts, lightly marked news, bare prose.
+    mode: keep          # keep | strip | partial | mixed
+    keep_range: [0.1, 0.6]
+    mixed_weights: [0.15, 0.25, 0.60]
   normalization:
     # Each of these rewrites the ground truth, so all default to off.
     strip_diacritics: false
