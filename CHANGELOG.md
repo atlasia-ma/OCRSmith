@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-08-13
+
+### Fixed
+
+- **Font coverage was checked against the wrong string, so Arabic could render as tofu.**
+  Coverage was judged on the *logical* text, but without Raqm the renderer draws Arabic
+  *presentation forms* (U+FE70-FEFF). A modern OpenType face such as Fustat or Mada covers
+  the base Arabic block while carrying no presentation-form glyphs at all — it joins
+  letters via GSUB instead — so the probe reported 100% coverage and every glyph then
+  rendered as an empty box, with the label still claiming the text. `FontPool` now shapes
+  before probing, using the same shaper the renderer will use. Raqm builds are unaffected
+  and correctly keep judging the logical form.
+- **The coverage probe missed table cells and list items.** A table block's own text is
+  empty; its content lives in the cells. An invoice whose prose was four words therefore
+  chose a font on the strength of those four words and drew its entire table as tofu.
+  Added `DocumentContent.all_text`, which includes cells and list items, and the pipeline
+  now probes against it.
+- **The font fallback silently discarded the guarantee.** When no face covered a document,
+  the pipeline fell back to the *entire* pool and could hand the document a face that
+  cannot draw its script at all. It now falls back to the single best-covering face.
+
+Found by rendering sample documents and looking at them — every automated check passed
+while the images were visibly broken.
+
 ## [1.0.1] - 2026-08-13
 
 ### Fixed
@@ -157,5 +181,6 @@ page before it reaches the dataset.
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
 
+[1.0.2]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.2
 [1.0.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.1
 [1.0.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.0

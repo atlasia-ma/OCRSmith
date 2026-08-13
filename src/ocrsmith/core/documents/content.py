@@ -53,6 +53,24 @@ class DocumentContent:
     def text(self) -> str:
         return "\n".join(block.text for block in self.blocks if block.text)
 
+    @property
+    def all_text(self) -> str:
+        """Every character the document will draw, including table cells and list items.
+
+        `text` reads block text only, and a table block's text is empty — the content
+        lives in its cells. Font coverage must be judged against *this*, or an invoice
+        whose prose is four words picks a face on the strength of those four words and
+        then renders its entire table as tofu.
+        """
+        parts: list[str] = []
+        for block in self.blocks:
+            if block.text:
+                parts.append(block.text)
+            parts.extend(block.items)
+            if block.table is not None:
+                parts.extend(cell.text for cell in block.table.cells if cell.text)
+        return "\n".join(parts)
+
     def __len__(self) -> int:
         return len(self.blocks)
 

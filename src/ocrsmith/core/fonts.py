@@ -19,6 +19,7 @@ from PIL import ImageFont
 from PIL.ImageFont import FreeTypeFont
 
 from ..text.coverage import fonts_supporting, supports_text
+from ..text.shaping import TextShaper, resolve_shaper
 
 __all__ = ["FontPool", "clear_font_cache", "discover_fonts", "load_font"]
 
@@ -86,11 +87,16 @@ class FontPool:
         include: Sequence[str] = (),
         exclude: Sequence[str] = (),
         require_full_coverage: bool = True,
+        shaper: TextShaper | None = None,
     ):
         self.faces = discover_fonts(paths, include=include, exclude=exclude)
         if not self.faces:
             raise ValueError(f"No font files found under {list(paths)!r}")
         self.require_full_coverage = require_full_coverage
+        # Coverage must be judged against the characters that will actually be drawn,
+        # which is the shaper's business — so the pool needs the same shaper the renderer
+        # will use.
+        self.shaper = shaper or resolve_shaper()
         self._coverage_cache: dict[tuple[str, str], bool] = {}
 
     def __len__(self) -> int:
@@ -124,11 +130,17 @@ class FontPool:
             self._coverage_cache[key] = cached
         return cached
 
-    @staticmethod
-    def _probe(text: str) -> str:
-        """The distinct characters of `text`, which is all coverage depends on.
+    def _probe(self, text: str) -> str:
+        """The distinct characters that will actually be *drawn* for `text`.
 
-        Collapsing to a character set turns a per-document question into a per-alphabet
-        one, so the coverage cache actually hits.
+        Shaping happens first, and this is the whole point. Without Raqm the renderer
+        draws Arabic presentation forms (U+FE70-FEFF), not the base letters — and a modern
+        OpenType face such as Fustat or Mada covers the base block while carrying no
+        presentation-form glyphs at all, because it joins letters via GSUB instead. Probing
+        the logical string reports 100% coverage for such a font and every glyph then
+        renders as tofu, with the label still claiming the text.
+
+        Collapsing to a character set afterwards turns a per-document question into a
+        per-alphabet one, so the coverage cache actually hits.
         """
-        return "".join(sorted(set(text)))
+        return "".join(sorted(set(self.shaper.shape(text).visual)))
