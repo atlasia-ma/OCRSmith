@@ -52,6 +52,10 @@ class GenerationResult:
     pages: int = 0
     shards: int = 0
     failures: int = 0
+    #: `(shard index, error)` for every shard that died. A bare count says a run went wrong
+    #: without saying what went wrong, which is the difference between a minute of
+    #: debugging and an hour of it.
+    shard_errors: tuple[tuple[int, str], ...] = ()
     #: Samples dropped by the quality gate, counted by the check that rejected them.
     rejected: dict = field(default_factory=dict)
     output_dir: Path = field(default_factory=Path)
@@ -63,6 +67,7 @@ class GenerationResult:
             "pages": self.pages,
             "shards": self.shards,
             "failures": self.failures,
+            "shard_errors": [list(item) for item in self.shard_errors],
             "rejected": dict(self.rejected),
             "output_dir": str(self.output_dir),
             "skipped_shards": list(self.skipped_shards),
@@ -193,10 +198,21 @@ def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResu
         if progress is not None:
             progress(summary)
 
+    errors: list[tuple[int, str]] = []
+
+    def record(plan: ShardPlan, error: BaseException) -> None:
+        """Keep the reason. One dead shard should not end a twelve-hour run, but losing
+        *why* it died turns a one-minute diagnosis into an afternoon."""
+        errors.append((plan.index, f"{type(error).__name__}: {error}"))
+        result.failures += 1
+
     workers = min(config.run.workers, len(plans)) if plans else 1
     if workers <= 1 or len(plans) == 1:
         for plan in plans:
-            absorb(run_shard(config, plan))
+            try:
+                absorb(_run_one(config, plan))
+            except Exception as error:  # noqa: PERF203 - one shard failing is not fatal
+                record(plan, error)
     else:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -208,11 +224,25 @@ def run_generation(config: GenerationConfig, *, progress=None) -> GenerationResu
             for future in as_completed(futures):
                 try:
                     absorb(future.result())
-                except Exception:
-                    result.failures += 1
+                except Exception as error:
+                    record(futures[future], error)
 
     result.skipped_shards = tuple(sorted(skipped))
+    result.shard_errors = tuple(errors)
+
+    if errors and not result.pages and not skipped:
+        # Every shard died and nothing was written. Returning a result here would report a
+        # successful run of zero pages, which is how a broken configuration reaches a
+        # training set as an empty directory nobody questioned.
+        reasons = "; ".join(f"shard {index}: {reason}" for index, reason in errors[:3])
+        raise RuntimeError(f"All {len(errors)} shard(s) failed and nothing was written. {reasons}")
+
     return result
+
+
+def _run_one(config: GenerationConfig, plan: ShardPlan) -> dict:
+    """Seam for running a single shard in-process, so both paths share failure handling."""
+    return run_shard(config, plan)
 
 
 def _worker(config_payload: dict, index: int, start: int, stop: int) -> dict:
