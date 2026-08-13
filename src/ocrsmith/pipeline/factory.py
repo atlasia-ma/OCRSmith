@@ -85,7 +85,12 @@ class SampleFactory:
 
         template = self.registry.sample(rng, self._template_names(rng))
         direction = self._direction(rng)
-        content = template.build(self.text, rng, direction=direction)
+        content = template.build(
+            self.text,
+            rng,
+            direction=direction,
+            numerals=self.config.text.normalization.numerals,
+        )
         content = self._with_footer(content, rng)
         content, diacritics_kept = self._apply_diacritics(content, rng)
 

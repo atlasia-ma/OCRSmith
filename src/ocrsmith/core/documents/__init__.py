@@ -21,7 +21,7 @@ from .templates import (
     TemplateRegistry,
     default_registry,
 )
-from .text_source import CorpusTextProvider, TextProvider
+from .text_source import CorpusTextProvider, FieldGenerator, TextProvider
 from .typography import (
     FontFamily,
     RoleTypography,
@@ -48,6 +48,7 @@ __all__ = [
     "DocumentContent",
     "DocumentRenderer",
     "DocumentTemplate",
+    "FieldGenerator",
     "FontFamily",
     "FormTemplate",
     "InvoiceTemplate",

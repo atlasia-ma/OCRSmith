@@ -21,7 +21,7 @@ from typing import Protocol, runtime_checkable
 from .charts import ChartKind, sample_chart
 from .content import DocumentBuilder, DocumentContent
 from .formulas import sample_formula
-from .text_source import TextProvider
+from .text_source import FieldGenerator, TextProvider
 
 __all__ = [
     "ArticleTemplate",
@@ -126,11 +126,30 @@ class FormTemplate:
 
     def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
         builder = DocumentBuilder(options.get("direction"), template=self.name)
+        fields = FieldGenerator(options.get("numerals", "keep"))
         builder.title(source.title(rng))
-        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 3)) for _ in range(rng.randint(4, 9))])
+        # Half the values are non-lexical - dates, references, amounts - because that is
+        # what a form actually holds, and it is the case a recogniser cannot guess at.
+        builder.key_values(
+            [
+                (
+                    source.phrase(rng, 2),
+                    fields.any_field(rng) if rng.random() < 0.5 else source.phrase(rng, 3),
+                )
+                for _ in range(rng.randint(4, 9))
+            ]
+        )
         builder.separator()
         builder.heading(source.phrase(rng, 3))
-        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 2)) for _ in range(rng.randint(3, 6))])
+        builder.key_values(
+            [
+                (
+                    source.phrase(rng, 2),
+                    fields.any_field(rng) if rng.random() < 0.6 else source.phrase(rng, 2),
+                )
+                for _ in range(rng.randint(3, 6))
+            ]
+        )
         return builder.build()
 
 
@@ -142,32 +161,27 @@ class InvoiceTemplate:
 
     def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
         builder = DocumentBuilder(options.get("direction"), template=self.name)
+        fields = FieldGenerator(options.get("numerals", "keep"))
         builder.title(source.phrase(rng, 3))
         builder.key_values(
             [
-                (source.phrase(rng, 2), f"{rng.randint(1000, 99999)}"),
-                (source.phrase(rng, 2), f"{rng.randint(1, 28)}/{rng.randint(1, 12)}/2026"),
+                (source.phrase(rng, 2), fields.code(rng)),
+                (source.phrase(rng, 2), fields.date(rng)),
+                (source.phrase(rng, 2), fields.phone(rng)),
             ]
         )
-        rows = [
-            [
-                source.phrase(rng, 2),
-                source.phrase(rng, 3),
-                str(rng.randint(1, 20)),
-                f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
-            ]
-        ]
+        rows = [[source.phrase(rng, 2), source.phrase(rng, 3), "#", fields.amount(rng)]]
         for _ in range(rng.randint(3, 8)):
             rows.append(
                 [
                     source.phrase(rng, 2),
                     source.phrase(rng, 4),
                     str(rng.randint(1, 20)),
-                    f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
+                    fields.amount(rng),
                 ]
             )
         builder.table(rows)
-        builder.key_values([(source.phrase(rng, 1), f"{rng.randint(100, 99999)}.00")])
+        builder.key_values([(source.phrase(rng, 1), fields.amount(rng))])
         builder.paragraph(source.paragraph(rng, 2))
         return builder.build()
 

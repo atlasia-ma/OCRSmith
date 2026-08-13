@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Non-prose corpus content.** A sentence corpus contains no dates, no reference numbers
+  and no partial words — precisely the cases where a recogniser has no language model to
+  lean on. `FieldGenerator` produces dates (three formats), amounts with currencies,
+  reference codes, phone numbers and percentages, in whichever numeral system the config
+  asks for; `CorpusTextProvider.fragment()` yields partial words as an occlusion or crop
+  boundary produces, and `.contextless()` yields unrelated words in sequence. The form and
+  invoice templates now use them, because that is what those documents actually hold.
+
 - **Three more genres and a handwriting setting.** Genre coverage is not decoration: a
   model trained only on flowing prose miscounts dot leaders, misreads slide-sized type,
   and transfers poorly to the handwriting-heavy Arabic benchmarks.
