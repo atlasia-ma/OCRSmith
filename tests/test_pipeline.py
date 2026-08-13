@@ -280,6 +280,64 @@ class TestRunGeneration:
         assert records(first) == records(second)
 
 
+class TestParallelismCeiling:
+    """A shard is the unit of parallelism, so `shard_size` caps how many workers can run.
+
+    Asking for twelve workers and getting two is a silent 6x throughput loss on a job
+    measured in days. The pipeline knows the real number; it has to say it.
+    """
+
+    def test_workers_are_capped_by_the_shard_count(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 12}, output={"shard_size": 250})
+
+        assert runner.effective_workers(config) == 2
+
+    def test_a_generous_shard_count_uses_every_worker(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 4}, output={"shard_size": 25})
+
+        assert runner.effective_workers(config) == 4
+
+    def test_the_shard_size_that_would_use_them_all_is_suggested(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 12}, output={"shard_size": 250})
+
+        advice = runner.parallelism_advice(config)
+
+        assert advice is not None
+        assert "2" in advice and "12" in advice
+        assert "output.shard_size" in advice
+
+    def test_no_advice_when_nothing_is_wrong(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 4}, output={"shard_size": 25})
+
+        assert runner.parallelism_advice(config) is None
+
+    def test_the_worker_count_does_not_change_the_dataset(self, tmp_path):
+        """The claim the README makes about scaling, checked rather than asserted.
+
+        Uses real worker processes: a sample derives from `(seed, index)`, so sharding it
+        differently must not move a single box.
+        """
+
+        def records(directory: Path):
+            merged = []
+            for path in sorted(directory.glob("annotations-*.jsonl")):
+                merged += [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            return sorted((record["id"], json.dumps(record["page"], sort_keys=True)) for record in merged)
+
+        serial = make_config(tmp_path / "serial", run={"num_samples": 6, "workers": 1})
+        parallel = make_config(tmp_path / "parallel", run={"num_samples": 6, "workers": 3})
+
+        run_generation(serial)
+        run_generation(parallel)
+
+        assert records(Path(serial.output.dir)) == records(Path(parallel.output.dir))
+
+    def test_a_single_worker_is_never_nagged(self, tmp_path):
+        config = make_config(tmp_path, run={"num_samples": 400, "workers": 1}, output={"shard_size": 250})
+
+        assert runner.parallelism_advice(config) is None
+
+
 class TestShardFailures:
     """A shard that dies must say why, and a run that produces nothing must not look fine.
 

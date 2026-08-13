@@ -15,7 +15,7 @@ from rich.table import Table
 
 from .config import DEFAULT_CONFIG_PATH, load_config
 from .datasets.writers import sink_names
-from .pipeline import SampleFactory, plan_shards, run_generation
+from .pipeline import SampleFactory, parallelism_advice, plan_shards, run_generation
 
 app = typer.Typer(
     add_completion=False,
@@ -59,6 +59,9 @@ def generate(
         f"in [cyan]{spec.output.dir}[/] as [cyan]{spec.output.format}[/] "
         f"using [bold]{spec.run.workers}[/] worker(s)"
     )
+    advice = parallelism_advice(spec)
+    if advice:
+        console.print(f"[yellow]{advice}[/]")
 
     with Progress(
         TextColumn("[progress.description]{task.description}"),
