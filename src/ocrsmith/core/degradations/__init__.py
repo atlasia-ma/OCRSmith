@@ -26,6 +26,7 @@ from .photometric import (
     Stains,
     Vignette,
 )
+from .physical import IlluminationField, PageCurl, Wrinkles
 from .presets import PRESETS, build_preset, preset_names
 
 __all__ = [
@@ -40,11 +41,13 @@ __all__ = [
     "Downscale",
     "Folds",
     "GaussianNoise",
+    "IlluminationField",
     "Glare",
     "InkErosion",
     "InkSpread",
     "JpegArtifacts",
     "MotionBlur",
+    "PageCurl",
     "PaperGrain",
     "PerspectiveWarp",
     "PhotometricDegradation",
@@ -52,6 +55,7 @@ __all__ = [
     "Shadow",
     "Stains",
     "Vignette",
+    "Wrinkles",
     "build_preset",
     "map_page",
     "perspective_coefficients",

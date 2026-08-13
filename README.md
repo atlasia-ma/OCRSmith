@@ -12,6 +12,10 @@
 
 ---
 
+> **OCRSmith produced the training data behind [AtlasOCR](https://huggingface.co/blog/imomayiz/atlasocr)**, the first
+> open-source Moroccan Darija OCR model — 86% of its corpus, ~10.7M words. AtlasOCR beats
+> comparable models on [KITAB-Bench](https://arxiv.org/pdf/2502.14949).
+
 OCRSmith generates **whole documents**, not cropped text lines: multi-column pages with
 titles, tables, figures, forms and running headers, degraded to look like something a
 scanner or a phone actually produced — and it emits the ground truth for every objective
@@ -26,6 +30,8 @@ One rendered page gives you, from the same pass:
 | Layout analysis | Typed regions (`title`, `table`, `figure`, `key_value`, …) in reading order |
 | Document → markup | The page serialised back to **Markdown** and **HTML** |
 | Table structure | Cell grid as HTML *and* **OTSL** |
+| Chart → JSON | The series values the chart was drawn from |
+| Formula → LaTeX | The expression tree the formula was typeset from |
 
 Everything is reproducible from a seed, streamed rather than materialised, and validated
 before it reaches the dataset.
@@ -48,11 +54,15 @@ script get Arabic subtly wrong in ways that are invisible until training plateau
 - **Silent truncation.** A wrapper that drops the tail of a paragraph produces an image
   whose label claims text that was never drawn. OCRSmith's wrapping is lossless, and text
   that does not fit is *reported*, not discarded.
+- **Uniform vocalisation.** Real Arabic is *partially* diacritised and the proportion
+  varies by genre. OCRSmith varies it per document — and never invents marks, because
+  diacritising bare text would make the label assert vowels nobody wrote.
 
 ## Install
 
 ```bash
 pip install -e ".[data,dev]"
+ocrsmith fetch-fonts --subset arabic     # 57 open-licensed families, licences included
 ```
 
 `data` adds pandas/pyarrow/`datasets` for tabular and Hugging Face corpora and for
@@ -65,7 +75,13 @@ ocrsmith doctor
 ```
 
 Pillow built with Raqm delegates shaping to HarfBuzz; without it OCRSmith falls back to
-`arabic-reshaper` + `python-bidi`. Both paths produce the same labels.
+`arabic-reshaper` + `python-bidi`. Both paths produce the same labels — but Raqm is worth
+having: it raises the usable font pool from **85 to 203 faces**, because most modern
+Arabic families join via GSUB and carry no presentation-form glyphs.
+
+```bash
+conda install -c conda-forge pillow      # usually ships with Raqm; pip wheels usually do not
+```
 
 ## Quick start
 
@@ -165,6 +181,26 @@ evaluation/     CER · WER · NED · table similarity · detection P/R/F1
 ```
 
 Longer version: [docs/architecture.md](docs/architecture.md).
+
+## What it generates
+
+**Ten document genres**, weighted so a corpus is balanced deliberately rather than
+accidentally:
+
+| Genre | Why it is there |
+| --- | --- |
+| `article`, `newspaper`, `letter` | The shapes that dominate real corpora |
+| `report` | Tables, charts and captions in context |
+| `paper` | Displayed equations interleaved with prose |
+| `form`, `invoice` | Label/value pairs, line-item tables, real reference numbers |
+| `contents` | Dot leaders — runs of identical glyphs that models miscount |
+| `slide` | Very large type, very little of it |
+| `notes` | Handwriting-style setting, for the handwriting-heavy Arabic benchmarks |
+
+**Five capture conditions** — `clean`, `scan`, `photo`, `fax`, `archive` — modelling
+physical cause rather than visual effect: toner spreading into fibres, text showing
+through a thin sheet, a page bending away from the sensor, uneven lighting, wrinkles,
+stains, folds, and the resolution loss that destroys diacritics.
 
 ## Configuring a corpus
 

@@ -16,6 +16,7 @@ thin and no annotation can be mutated halfway down a pipeline.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -49,6 +50,7 @@ class RegionType(str, Enum):
     LIST = "list"
     TABLE = "table"
     FIGURE = "figure"
+    CHART = "chart"
     CAPTION = "caption"
     HEADER = "header"
     FOOTER = "footer"
@@ -374,11 +376,12 @@ class Page:
             elif region.type is RegionType.LIST:
                 items = "".join(f"<li>{escape(line.text)}</li>" for line in region.lines)
                 parts.append(f"<ul>{items}</ul>")
-            elif region.type is RegionType.FIGURE:
+            elif region.type in (RegionType.FIGURE, RegionType.CHART):
                 alt = escape(str(region.attributes.get("alt", "")))
                 parts.append(f'<figure><img alt="{alt}"></figure>')
             elif region.type is RegionType.FORMULA:
-                parts.append(f"<math>{escape(region.text)}</math>")
+                latex = region.attributes.get("latex", region.text)
+                parts.append(f"<math>{escape(str(latex))}</math>")
             elif region.type is RegionType.SEPARATOR:
                 parts.append("<hr>")
             else:
@@ -397,7 +400,13 @@ class Page:
             elif region.type is RegionType.SEPARATOR:
                 parts.append("---")
             elif region.type is RegionType.FORMULA:
-                parts.append(f"$$\n{region.text}\n$$")
+                # A formula's ground truth is its LaTeX, not the pixels' plain text.
+                parts.append(f"$$\n{region.attributes.get('latex') or region.text}\n$$")
+            elif region.type is RegionType.CHART:
+                # Chart-to-JSON: the data the drawing was derived from is the target.
+                chart = region.attributes.get("chart")
+                if chart:
+                    parts.append(f"```json\n{json.dumps(chart, ensure_ascii=False)}\n```")
             elif region.type is RegionType.CODE:
                 parts.append(f"```\n{region.text}\n```")
             elif region.type is RegionType.CAPTION:

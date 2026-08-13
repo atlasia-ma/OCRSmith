@@ -6,7 +6,79 @@ All notable changes to this project are documented here. The format follows
 
 ## [1.1.0] - 2026-08-13
 
+Six tracks of work chosen from a survey of what the current OCR literature says synthetic
+data is missing, and from the limitations AtlasOCR — trained on OCRSmith output — reports
+about itself.
+
 ### Added
+
+- **Non-prose corpus content.** A sentence corpus contains no dates, no reference numbers
+  and no partial words — precisely the cases where a recogniser has no language model to
+  lean on. `FieldGenerator` produces dates (three formats), amounts with currencies,
+  reference codes, phone numbers and percentages, in whichever numeral system the config
+  asks for; `CorpusTextProvider.fragment()` yields partial words as an occlusion or crop
+  boundary produces, and `.contextless()` yields unrelated words in sequence. The form and
+  invoice templates now use them, because that is what those documents actually hold.
+
+- **Three more genres and a handwriting setting.** Genre coverage is not decoration: a
+  model trained only on flowing prose miscounts dot leaders, misreads slide-sized type,
+  and transfers poorly to the handwriting-heavy Arabic benchmarks.
+  - `contents` — a table of contents with dot leaders, which are their own recognition
+    problem: a long run of identical glyphs that models routinely miscount.
+  - `slide` — a headline and a few short bullets set large; a distinct visual regime that
+    dense-prose training reads poorly.
+  - `notes` — handwritten notes. `TypographySampler(handwritten=True)` prefers a
+    handwriting or calligraphic family and loosens the setting with baseline and word-gap
+    jitter, because a hand holds neither a constant baseline nor an even word gap. This is
+    **not** a substitute for real handwriting data — the letterforms still come from a
+    font — but it covers the layout and the visual regime.
+
+- **Charts with their data** (`ocrsmith.core.documents.charts`). Chart-to-JSON is a
+  first-class task in the Arabic document benchmarks and no synthetic generator covered it.
+  Bar, horizontal-bar, line and pie charts are drawn *from* their series values, so the
+  JSON ground truth cannot drift from the picture. Axis and title labels are real
+  annotated text, so a chart supervises recognition and detection as well.
+- **Formulas typeset from a tree** (`ocrsmith.core.documents.formulas`). Formula
+  conversion is the largest gain category in the document-parsing benchmarks, and a
+  `FORMULA` region previously rendered as plain text. A small typesetter handles
+  fractions, powers, indices, radicals and sums/integrals with limits, positioned on a
+  baseline — and emits the LaTeX from the same tree, so the two cannot disagree. No LaTeX
+  toolchain required.
+  - `choose_math_font` applies glyph coverage to mathematics: most text faces have no
+    summation sign, and choosing blindly produced a formula of empty boxes whose LaTeX
+    confidently asserted a sum.
+- `RegionType.CHART`, `DocumentBuilder.chart()` / `.formula()`, and a `paper` template
+  that interleaves prose with displayed equations. Chart JSON and formula LaTeX both reach
+  the Markdown ground truth.
+
+- **Physical degradations** (`ocrsmith.core.degradations.physical`). Rendering-based
+  synthesis produces a page lying perfectly flat under perfectly uniform light; real
+  captures never do, and modelling the difference is worth several points on documents
+  photographed in the wild.
+  - `Wrinkles` — local displacement plus the shading its ridges catch.
+  - `PageCurl` — a bound page bending away from the sensor, compressing text towards one
+    edge and darkening into the gutter. Flat perspective warping cannot produce this.
+  - `IlluminationField` — smooth, arbitrary lighting, distinct from `Shadow` (a linear
+    ramp) and `Vignette` (radial and centred).
+
+  All three are displacement or field effects rather than colour transforms, and the
+  deformations carry the annotation through the same field — verified by measuring where
+  the ink actually landed and requiring the boxes to be there (IoU > 0.85).
+
+  The `photo` and `archive` presets now use them.
+
+- **Diacritics control** (`ocrsmith.text.diacritics`). Arabic OCR handles vocalisation
+  badly, and it is the first limitation AtlasOCR reports about itself. The cause is
+  distributional: real Arabic is *partially* diacritised, and the proportion varies by
+  genre. `DiacriticsPolicy` samples per document across four modes (`keep`, `strip`,
+  `partial`, `mixed`), and records the kept fraction in provenance so a diacritics
+  ablation is possible later. `DatasetStats` reports the corpus split across bare, partial
+  and fully marked pages.
+
+  Marks are only ever **removed**, never invented. Adding vocalisation to bare text needs
+  a diacritiser model and would make the label assert vowels nobody wrote — a fabricated
+  ground truth that looks entirely plausible. Point `text.source` at a diacritised corpus
+  and let the policy vary it downwards.
 
 - **`ocrsmith fetch-fonts`** — downloads open-licensed families from Google Fonts on
   demand. Font diversity is the highest-impact lever in synthetic text data, and a

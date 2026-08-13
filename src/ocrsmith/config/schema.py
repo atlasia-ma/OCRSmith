@@ -21,6 +21,7 @@ __all__ = [
     "FALLBACK_SENTENCES",
     "BackgroundConfig",
     "DegradationConfig",
+    "DiacriticsConfig",
     "FontConfig",
     "GenerationConfig",
     "OutputConfig",
@@ -93,6 +94,20 @@ class TextSourceConfig(BaseModel):
         return self
 
 
+class DiacriticsConfig(BaseModel):
+    """How vocalised the corpus is.
+
+    Real Arabic is *partially* diacritised and the proportion varies by genre, so a corpus
+    that is uniformly marked or uniformly bare teaches a model to expect that uniformity.
+    Marks are only ever removed, never invented: adding them would fabricate ground truth.
+    """
+
+    mode: Literal["keep", "strip", "partial", "mixed"] = "keep"
+    keep_range: tuple[float, float] = (0.1, 0.6)
+    #: Weights for "mixed": fully marked, partially marked, unmarked.
+    mixed_weights: tuple[float, float, float] = (0.15, 0.25, 0.60)
+
+
 class NormalizationConfig(BaseModel):
     """Label-affecting text transforms. Every one of these changes the ground truth."""
 
@@ -106,6 +121,7 @@ class NormalizationConfig(BaseModel):
 
 class TextConfig(BaseModel):
     source: TextSourceConfig = Field(default_factory=TextSourceConfig)
+    diacritics: DiacriticsConfig = Field(default_factory=DiacriticsConfig)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     #: "auto" reads the direction from the text itself.
     direction: Literal["auto", "rtl", "ltr"] = "auto"
@@ -162,9 +178,13 @@ class TemplateConfig(BaseModel):
             "article": 3.0,
             "report": 2.0,
             "newspaper": 1.5,
+            "paper": 1.5,
             "letter": 1.0,
             "form": 1.0,
             "invoice": 1.0,
+            "contents": 0.8,
+            "slide": 0.8,
+            "notes": 1.0,
         }
     )
 

@@ -18,16 +18,22 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from .charts import ChartKind, sample_chart
 from .content import DocumentBuilder, DocumentContent
-from .text_source import TextProvider
+from .formulas import sample_formula
+from .text_source import FieldGenerator, TextProvider
 
 __all__ = [
     "ArticleTemplate",
+    "ContentsTemplate",
+    "NotesTemplate",
+    "SlideTemplate",
     "DocumentTemplate",
     "FormTemplate",
     "InvoiceTemplate",
     "LetterTemplate",
     "NewspaperTemplate",
+    "PaperTemplate",
     "ReportTemplate",
     "TemplateRegistry",
     "default_registry",
@@ -80,7 +86,15 @@ class ReportTemplate:
         builder.table(_sample_table(source, rng))
         builder.caption(source.phrase(rng, 6))
         builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
-        if rng.random() < 0.5:
+        if rng.random() < 0.55:
+            labels = [source.phrase(rng, 1) for _ in range(4)]
+            builder.chart(
+                sample_chart(rng, labels, title=source.phrase(rng, 3)),
+                width=rng.randint(260, 420),
+                height=rng.randint(190, 300),
+            )
+            builder.caption(source.phrase(rng, 5))
+        elif rng.random() < 0.5:
             builder.figure(width=rng.randint(240, 420), height=rng.randint(160, 300))
             builder.caption(source.phrase(rng, 5))
         builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
@@ -112,11 +126,30 @@ class FormTemplate:
 
     def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
         builder = DocumentBuilder(options.get("direction"), template=self.name)
+        fields = FieldGenerator(options.get("numerals", "keep"))
         builder.title(source.title(rng))
-        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 3)) for _ in range(rng.randint(4, 9))])
+        # Half the values are non-lexical - dates, references, amounts - because that is
+        # what a form actually holds, and it is the case a recogniser cannot guess at.
+        builder.key_values(
+            [
+                (
+                    source.phrase(rng, 2),
+                    fields.any_field(rng) if rng.random() < 0.5 else source.phrase(rng, 3),
+                )
+                for _ in range(rng.randint(4, 9))
+            ]
+        )
         builder.separator()
         builder.heading(source.phrase(rng, 3))
-        builder.key_values([(source.phrase(rng, 2), source.phrase(rng, 2)) for _ in range(rng.randint(3, 6))])
+        builder.key_values(
+            [
+                (
+                    source.phrase(rng, 2),
+                    fields.any_field(rng) if rng.random() < 0.6 else source.phrase(rng, 2),
+                )
+                for _ in range(rng.randint(3, 6))
+            ]
+        )
         return builder.build()
 
 
@@ -128,33 +161,64 @@ class InvoiceTemplate:
 
     def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
         builder = DocumentBuilder(options.get("direction"), template=self.name)
+        fields = FieldGenerator(options.get("numerals", "keep"))
         builder.title(source.phrase(rng, 3))
         builder.key_values(
             [
-                (source.phrase(rng, 2), f"{rng.randint(1000, 99999)}"),
-                (source.phrase(rng, 2), f"{rng.randint(1, 28)}/{rng.randint(1, 12)}/2026"),
+                (source.phrase(rng, 2), fields.code(rng)),
+                (source.phrase(rng, 2), fields.date(rng)),
+                (source.phrase(rng, 2), fields.phone(rng)),
             ]
         )
-        rows = [
-            [
-                source.phrase(rng, 2),
-                source.phrase(rng, 3),
-                str(rng.randint(1, 20)),
-                f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
-            ]
-        ]
+        rows = [[source.phrase(rng, 2), source.phrase(rng, 3), "#", fields.amount(rng)]]
         for _ in range(rng.randint(3, 8)):
             rows.append(
                 [
                     source.phrase(rng, 2),
                     source.phrase(rng, 4),
                     str(rng.randint(1, 20)),
-                    f"{rng.randint(10, 9999)}.{rng.randint(0, 99):02d}",
+                    fields.amount(rng),
                 ]
             )
         builder.table(rows)
-        builder.key_values([(source.phrase(rng, 1), f"{rng.randint(100, 99999)}.00")])
+        builder.key_values([(source.phrase(rng, 1), fields.amount(rng))])
         builder.paragraph(source.paragraph(rng, 2))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class PaperTemplate:
+    """An academic paper: prose interleaved with displayed equations.
+
+    Formula conversion is the largest gain category in the document-parsing benchmarks,
+    and it needs formulas *in context* - a page of nothing but equations is not what a
+    model meets in the wild.
+    """
+
+    name: str = "paper"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.title(rng))
+        builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+        for _ in range(rng.randint(2, 4)):
+            builder.heading(source.title(rng))
+            builder.paragraph(source.paragraph(rng, rng.randint(2, 4)))
+            builder.formula(sample_formula(rng))
+            if rng.random() < 0.4:
+                builder.paragraph(source.paragraph(rng, 2))
+        if rng.random() < 0.5:
+            builder.chart(
+                sample_chart(
+                    rng,
+                    [source.phrase(rng, 1) for _ in range(4)],
+                    title=source.phrase(rng, 3),
+                    kind=ChartKind.LINE,
+                ),
+                width=rng.randint(240, 400),
+                height=rng.randint(170, 260),
+            )
+            builder.caption(source.phrase(rng, 5))
         return builder.build()
 
 
@@ -173,6 +237,75 @@ class NewspaperTemplate:
                 builder.heading(source.title(rng), level=3)
             for _ in range(rng.randint(2, 4)):
                 builder.paragraph(source.paragraph(rng, rng.randint(3, 6)))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class ContentsTemplate:
+    """A table of contents: label, dot leaders, page number.
+
+    Dot leaders are their own recognition problem - a long run of identical glyphs that
+    models routinely miscount or hallucinate - and no synthetic corpus generates them.
+    """
+
+    name: str = "contents"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.phrase(rng, 2))
+        page = rng.randint(1, 9)
+        for _ in range(rng.randint(8, 16)):
+            label = source.phrase(rng, rng.randint(2, 5))
+            leader = "." * rng.randint(6, 30)
+            builder.paragraph(f"{label} {leader} {page}")
+            page += rng.randint(1, 12)
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class SlideTemplate:
+    """A presentation slide: a headline and a few short bullets, set large.
+
+    Slides are a distinct visual regime - very large type, very little of it - and a model
+    trained only on dense prose reads them poorly.
+    """
+
+    name: str = "slide"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name)
+        builder.title(source.phrase(rng, rng.randint(2, 5)))
+        builder.list([source.phrase(rng, rng.randint(3, 8)) for _ in range(rng.randint(3, 6))])
+        if rng.random() < 0.4:
+            builder.chart(
+                sample_chart(rng, [source.phrase(rng, 1) for _ in range(4)], title=""),
+                width=rng.randint(280, 420),
+                height=rng.randint(180, 260),
+            )
+        builder.footer(source.phrase(rng, 2))
+        return builder.build()
+
+
+@dataclass(frozen=True, slots=True)
+class NotesTemplate:
+    """Handwritten notes: a heading and loose lines, drawn in a handwriting face.
+
+    The Arabic benchmarks are handwriting-heavy (KHATT, Muharaf, and most of KITAB-Bench's
+    handwritten domain), and a printed-only corpus transfers to them poorly. This is not a
+    substitute for real handwriting data - the letterforms come from a font, so the
+    variability of a human hand is missing - but it covers the layout and the visual
+    regime, and it is honest about which it is.
+    """
+
+    name: str = "notes"
+
+    def build(self, source: TextProvider, rng: random.Random, **options) -> DocumentContent:
+        builder = DocumentBuilder(options.get("direction"), template=self.name, handwritten=True)
+        builder.heading(source.phrase(rng, rng.randint(2, 4)))
+        for _ in range(rng.randint(4, 9)):
+            builder.paragraph(source.sentence(rng))
+        if rng.random() < 0.5:
+            builder.list([source.phrase(rng, rng.randint(2, 6)) for _ in range(rng.randint(2, 5))])
         return builder.build()
 
 
@@ -234,7 +367,11 @@ def default_registry() -> TemplateRegistry:
         .register(ArticleTemplate(), weight=3.0)
         .register(ReportTemplate(), weight=2.0)
         .register(NewspaperTemplate(), weight=1.5)
+        .register(PaperTemplate(), weight=1.5)
         .register(LetterTemplate(), weight=1.0)
         .register(FormTemplate(), weight=1.0)
         .register(InvoiceTemplate(), weight=1.0)
+        .register(ContentsTemplate(), weight=0.8)
+        .register(SlideTemplate(), weight=0.8)
+        .register(NotesTemplate(), weight=1.0)
     )

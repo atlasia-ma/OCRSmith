@@ -31,6 +31,7 @@ from ..core.documents import (
 )
 from ..core.fonts import FontPool
 from ..domain import Provenance, Sample
+from ..text.diacritics import DiacriticsMode, DiacriticsPolicy, apply_diacritics
 from ..text.script import Direction
 
 __all__ = ["SampleFactory"]
@@ -84,8 +85,14 @@ class SampleFactory:
 
         template = self.registry.sample(rng, self._template_names(rng))
         direction = self._direction(rng)
-        content = template.build(self.text, rng, direction=direction)
+        content = template.build(
+            self.text,
+            rng,
+            direction=direction,
+            numerals=self.config.text.normalization.numerals,
+        )
         content = self._with_footer(content, rng)
+        content, diacritics_kept = self._apply_diacritics(content, rng)
 
         spec = self._page_spec(self.config.page, direction, rng)
         typography = self._typography(content, rng)
@@ -121,6 +128,7 @@ class SampleFactory:
                     degradations=tuple(record.to_dict() for record in records),
                     extra={
                         "index": index,
+                        "diacritics_kept": round(diacritics_kept, 3),
                         "page": rendered.number,
                         "preset": preset_name,
                         "paper": spec.width,
@@ -170,7 +178,7 @@ class SampleFactory:
             # prevent. Fall back to the best face instead, and only that one.
             faces = (self.fonts.choose(probe, rng),)
         sampler = TypographySampler(faces, body_size_range=tuple(self.config.fonts.size_range))
-        return sampler.sample(rng)
+        return sampler.sample(rng, handwritten=bool(content.metadata.get("handwritten")))
 
     @staticmethod
     def _table_style(rng: random.Random) -> TableStyle:
@@ -187,6 +195,50 @@ class SampleFactory:
             header_fill=(226, 230, 236) if shade < 0.35 else None,
             zebra_fill=(243, 245, 248) if shade > 0.75 else None,
         )
+
+    def _apply_diacritics(self, content, rng: random.Random):
+        """Vary how vocalised this document is, sampled once for the whole page.
+
+        Applied to the assembled content rather than at corpus load, so the fraction is a
+        property of the *document* - which is how real vocalisation works, a whole text
+        being marked or not - and so it can be recorded in provenance for an ablation.
+        """
+        settings = self.config.text.diacritics
+        if settings.mode == "keep":
+            return content, 1.0
+
+        policy = DiacriticsPolicy(
+            mode=DiacriticsMode(settings.mode),
+            keep_range=tuple(settings.keep_range),
+            mixed_weights=tuple(settings.mixed_weights),
+        )
+        kept = 1.0
+        blocks = []
+        for block in content.blocks:
+            text, kept = apply_diacritics(block.text, policy, rng) if block.text else (block.text, kept)
+            table = block.table
+            if table is not None:
+                table = type(table)(
+                    table.rows,
+                    table.cols,
+                    tuple(
+                        type(cell)(
+                            cell.row,
+                            cell.col,
+                            apply_diacritics(cell.text, policy, rng)[0],
+                            cell.bbox,
+                            cell.row_span,
+                            cell.col_span,
+                            cell.is_header,
+                            cell.lines,
+                        )
+                        for cell in table.cells
+                    ),
+                    table.has_header_row,
+                )
+            items = tuple(apply_diacritics(item, policy, rng)[0] for item in block.items)
+            blocks.append(type(block)(block.type, text, items, table, dict(block.attributes)))
+        return type(content)(tuple(blocks), content.direction, dict(content.metadata)), kept
 
     def _with_footer(self, content, rng: random.Random):
         if self.config.page.footer_probability <= 0 or rng.random() > self.config.page.footer_probability:
