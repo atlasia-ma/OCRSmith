@@ -252,6 +252,8 @@ ocrsmith preview --set run.start_index=8412 --count 1 --boxes
 - A completed shard is marked done, so an interrupted job **resumes** instead of restarting.
 - Font metrics are cached per `(font, size, shaper)`, which is most of the cost of laying
   out a page.
+- Degradation fields are built from broadcast axis vectors rather than full-page grids —
+  worth ~1.6x on the default preset mix, for byte-identical output.
 
 ```bash
 ocrsmith generate -n 1000000 --workers 32 --format webdataset -o /mnt/data/ocr

@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-13
+
+### Changed
+
+- **Degradations are about 1.6x faster on the default preset mix, and produce byte-identical
+  output.** Profiling the per-page cost — the question left open by 1.2.1 — showed
+  degradation was 75-90% of a page, and that most of it was waste rather than physics.
+  Seven degradations built their fields from `np.mgrid[0:height, 0:width]`, two full-page
+  int64 arrays (60 MB for A4 at 200 dpi) before a single arithmetic temporary, when every
+  one of those fields is either separable or depends on a single axis. `Wrinkles` also
+  computed both axes of a gradient and used one.
+
+  Per preset, 12 pages each: `photo` 4.30 → 2.42 s/page, `archive` 3.54 → 2.40,
+  `scan` 1.72 → 1.18, `fax` 1.53 → 1.03. The worst individual steps: `Folds` 1.18 → 0.33s,
+  `PageCurl` 1.45 → 0.75s, `Wrinkles` 2.17 → 1.16s.
+
+  A speed-up in a data generator is only legitimate if the data does not move, so all 38
+  degradation configurations across the four presets were hashed — pixels and serialised
+  annotation — before and after, on a fixed page and seed. All 38 identical. The
+  equivalence is a test rather than a claim: `_axes` must equal the `np.mgrid` it replaced,
+  exactly.
+
 ## [1.2.1] - 2026-08-13
 
 Both entries were found by re-running the benchmark after the 1.2.0 fixes, not by a test.
