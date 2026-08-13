@@ -94,7 +94,11 @@ class SampleFactory:
         content = self._with_footer(content, rng)
         content, diacritics_kept = self._apply_diacritics(content, rng)
 
-        spec = self._page_spec(self.config.page, direction, rng)
+        # The page must read in the same direction as its text. With `direction: auto` the
+        # configured value is None, and defaulting the *spec* to LTR ordered the columns
+        # left-first while the text inside them ran right-to-left - so an Arabic page was
+        # read in the wrong column order.
+        spec = self._page_spec(self.config.page, direction or content.direction, rng)
         typography = self._typography(content, rng)
         background, background_kind = self.backgrounds.sample(rng)
         preset_name = _weighted_choice(self.config.degradations.presets, rng)

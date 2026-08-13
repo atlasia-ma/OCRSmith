@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-08-13
+
+### Fixed
+
+- **An Arabic page with more than one column was laid out to be read in the wrong order.**
+  With the default `text.direction: auto`, the configured direction is `None`; the text
+  still came out right-to-left from the content, but the *page spec* fell back to
+  left-to-right, so `column_boxes()` ordered the columns left-first. The result was a page
+  whose text ran right-to-left inside columns that were read left-to-right. Nothing
+  raised, the pixels looked plausible, and only the reading order was wrong. The page spec
+  now follows the content's direction when none is configured.
+
 ## [1.1.0] - 2026-08-13
 
 Six tracks of work chosen from a survey of what the current OCR literature says synthetic
@@ -278,6 +290,7 @@ page before it reaches the dataset.
   were unset, which made every sample fail for configs that omit them.
 - Whitespace-only input no longer produces a zero-sized canvas.
 
+[1.1.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.1.1
 [1.1.0]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.1.0
 [1.0.2]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.2
 [1.0.1]: https://github.com/atlasia-ma/OCRSmith/releases/tag/v1.0.1
