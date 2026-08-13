@@ -311,6 +311,27 @@ class TestParallelismCeiling:
 
         assert runner.parallelism_advice(config) is None
 
+    def test_the_worker_count_does_not_change_the_dataset(self, tmp_path):
+        """The claim the README makes about scaling, checked rather than asserted.
+
+        Uses real worker processes: a sample derives from `(seed, index)`, so sharding it
+        differently must not move a single box.
+        """
+
+        def records(directory: Path):
+            merged = []
+            for path in sorted(directory.glob("annotations-*.jsonl")):
+                merged += [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            return sorted((record["id"], json.dumps(record["page"], sort_keys=True)) for record in merged)
+
+        serial = make_config(tmp_path / "serial", run={"num_samples": 6, "workers": 1})
+        parallel = make_config(tmp_path / "parallel", run={"num_samples": 6, "workers": 3})
+
+        run_generation(serial)
+        run_generation(parallel)
+
+        assert records(Path(serial.output.dir)) == records(Path(parallel.output.dir))
+
     def test_a_single_worker_is_never_nagged(self, tmp_path):
         config = make_config(tmp_path, run={"num_samples": 400, "workers": 1}, output={"shard_size": 250})
 

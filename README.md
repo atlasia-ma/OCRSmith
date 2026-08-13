@@ -257,6 +257,23 @@ ocrsmith preview --set run.start_index=8412 --count 1 --boxes
 ocrsmith generate -n 1000000 --workers 32 --format webdataset -o /mnt/data/ocr
 ```
 
+**A shard is the unit of parallelism**, so `output.shard_size` sets the ceiling on workers:
+400 documents in 250-document shards is two shards, and therefore two processes however
+many you ask for. `generate` says so before the run rather than leaving you to infer it
+from the clock. Measured on 400 documents, 6 physical cores:
+
+| workers | shards | elapsed | speedup | peak RSS |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 2 | 1371s | — | 535 MB |
+| 4 | 2 | 849s | 1.6x | 826 MB |
+| 4 | 8 | 427s | **3.2x** | 1.3 GB |
+| 12 | 16 | 259s | **5.3x** | 2.5 GB |
+
+Rule of thumb: `shard_size ≈ num_samples / workers`, and budget ~210 MB per worker.
+Every row above produced the same 378 pages and the same 22 rejections: a sample derives
+from `(seed, index)`, never from execution order, so the worker count does not change the
+dataset.
+
 ## Validating the corpus
 
 The sim-to-real gap is usually answered with an assertion. Measure it instead:
