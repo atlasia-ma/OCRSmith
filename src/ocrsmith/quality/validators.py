@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from PIL import ImageFilter
 
 from ..domain import RegionType, Sample
 
@@ -131,31 +132,53 @@ class MinInkCoverage(Validator):
 class MinContrast(Validator):
     """Text that cannot be distinguished from its background is unreadable ground truth."""
 
-    def __init__(self, min_difference: float = 25.0, max_regions: int = 12):
+    def __init__(
+        self,
+        min_difference: float = 90.0,
+        max_regions: int = 12,
+        max_failing_fraction: float = 0.5,
+        window: int = 9,
+    ):
         self.min_difference = min_difference
         self.max_regions = max_regions
+        self.max_failing_fraction = max_failing_fraction
+        self.window = window
 
     def check(self, sample: Sample) -> Verdict:
-        grey = np.asarray(sample.image.convert("L"), dtype=np.float32)
+        grey = sample.image.convert("L")
+        ink = np.asarray(grey, dtype=np.float32)
+        # How far ink falls below the paper *immediately around it*. A percentile spread
+        # taken across the whole block measures whatever varies within it, and on a folded
+        # or stained page that is the shading, not the text: blocks whose text had been
+        # erased scored higher than headings that were still perfectly readable. Dilating
+        # the page by a stroke's width estimates the local paper level, so smooth shading
+        # subtracts out and only stroke-scale darkness survives.
+        paper = np.asarray(grey.filter(ImageFilter.MaxFilter(self.window)), dtype=np.float32)
+        depth = paper - ink
         differences: list[float] = []
         for region in sample.page.ordered_regions()[: self.max_regions]:
             if not region.lines:
                 continue
             x0, y0, x1, y1 = region.bbox.as_int()
-            patch = grey[max(0, y0) : y1, max(0, x0) : x1]
+            patch = depth[max(0, y0) : y1, max(0, x0) : x1]
             if patch.size < 16:
                 continue
-            # Contrast is a *local* property: compare the darkest pixels of the block
-            # against its own paper. Comparing a block's mean to the page mean instead
-            # would flag every sparse page, because a text block is mostly paper too.
-            ink, paper = np.percentile(patch, [10, 90])
-            differences.append(float(paper - ink))
+            # The darkest stroke pixels, not the mean: a text block is mostly paper.
+            differences.append(float(np.percentile(patch, 99)))
         if not differences:
             return self._ok()
-        best = max(differences)
-        if best < self.min_difference:
-            return self._fail(f"text stands out from its background by only {best:.1f} levels", best)
-        return self._ok(best)
+        # Judged per block, not by the best one on the page. A faded scan often keeps its
+        # heading dark while every body block washes out; taking the maximum let that page
+        # through carrying a full transcription of text no reader could recover.
+        failing = sum(1 for d in differences if d < self.min_difference) / len(differences)
+        if failing > self.max_failing_fraction:
+            worst = min(differences)
+            return self._fail(
+                f"{failing:.0%} of text blocks stand out from their background by under "
+                f"{self.min_difference:g} levels (worst {worst:.1f})",
+                failing,
+            )
+        return self._ok(failing)
 
 
 class BoxesInsidePage(Validator):

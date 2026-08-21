@@ -342,7 +342,11 @@ class DocumentRenderer:
         )
         if rendered.size[1] > available:
             return None
-        x, y = int(round(column.x0)), int(round(top))
+        # A table narrower than its column starts where the column's text starts, which on an
+        # RTL page is the right edge. Pinning every table to x0 left Arabic pages with their
+        # tables against the left margin and every paragraph beside them ranged right.
+        x = column.x1 - rendered.size[0] if direction.is_rtl else column.x0
+        x, y = int(round(x)), int(round(top))
         image.alpha_composite(rendered.image, (x, y))
         placed = rendered.translated(x, y)
         box = BBox(x, y, x + rendered.size[0], y + rendered.size[1])

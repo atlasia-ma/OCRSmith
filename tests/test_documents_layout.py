@@ -299,6 +299,29 @@ class TestFlowLayout:
         assert all(cell.bbox is not None for cell in cells)
         assert all(tables[0].bbox.contains(cell.bbox) for cell in cells)
 
+    def test_a_table_on_a_right_to_left_page_starts_at_the_right_margin(
+        self, renderer, typography, rng, arabic_source
+    ):
+        """A table narrower than its column must begin where the column's text begins.
+
+        Pinned to x0 instead, an Arabic page put its table against the left margin with
+        every paragraph beside it ranged right.
+        """
+        content = (
+            DocumentBuilder(direction=Direction.RTL)
+            .paragraph(arabic_source.sentence(rng))
+            .table([["أ", "ب"], ["1", "2"]])
+            .build()
+        )
+        spec = PageSpec.from_paper("a5", dpi=100, direction=Direction.RTL)
+
+        page = renderer.render(content, spec, typography, rng=rng)[0]
+
+        table = page.page.regions_of(RegionType.TABLE)[0]
+        paragraph = page.page.regions_of(RegionType.PARAGRAPH)[0]
+        assert table.bbox.x1 == pytest.approx(paragraph.bbox.x1, abs=2)
+        assert table.bbox.x0 > paragraph.bbox.x0
+
     def test_figures_are_annotated_even_though_they_are_placeholders(self, renderer, typography, rng):
         content = DocumentBuilder().figure(200, 120, caption="cap").build()
 

@@ -72,6 +72,35 @@ def build_sample(
     )
 
 
+def build_banded_sample(inks: tuple[tuple[int, int, int], ...]) -> Sample:
+    """A page of stacked text blocks, one per ink, so blocks can differ in legibility."""
+    paper = (250, 248, 244)
+    image = Image.new("RGB", (320, 60 * len(inks) + 20), paper)
+    draw = ImageDraw.Draw(image)
+    regions = []
+    for index, ink in enumerate(inks):
+        box = BBox(20, 20 + index * 60, 300, 60 + index * 60)
+        y = box.y0 + 2
+        while y < box.y1 - 2:
+            draw.rectangle((box.x0, y, box.x1, min(y + 3, box.y1)), fill=ink)
+            y += 6
+        words = (Word("كلمة", box),)
+        line = Line("كلمة", box, words, Direction.RTL)
+        regions.append(Region(RegionType.PARAGRAPH, box, (line,), None, 0))
+    return Sample(
+        id="00000001_01",
+        image=image,
+        page=Page(image.width, image.height, tuple(regions), Direction.RTL),
+        provenance=Provenance(
+            seed=1,
+            template="article",
+            background="paper",
+            font_path="assets/fonts/X-Regular.ttf",
+            extra={"index": 1, "page": 1, "preset": "archive"},
+        ),
+    )
+
+
 class TestNonEmptyText:
     def test_accepts_a_normal_page(self):
         assert NonEmptyText().check(build_sample()).passed
@@ -111,6 +140,55 @@ class TestMinContrast:
         washed = build_sample(ink=(246, 244, 240), paper=(250, 248, 244))
 
         assert not MinContrast().check(washed).passed
+
+    def test_rejects_a_washed_out_body_under_a_heading_that_survived(self):
+        """A faded scan keeps its heading dark long after the body is unrecoverable.
+
+        Judging the page by its best block accepted exactly this, with a full
+        transcription attached to text no reader could make out.
+        """
+        dark, faded = (10, 10, 10), (246, 244, 240)
+        sample = build_banded_sample((dark, faded, faded, faded))
+
+        assert not MinContrast().check(sample).passed
+
+    def test_rejects_a_block_whose_only_variation_is_fold_shading(self):
+        """A fold crossing a block varies its brightness without any ink surviving.
+
+        Measured as a percentile spread over the block, that shading read as strong
+        contrast — an erased paragraph under a fold scored higher than a heading that was
+        still perfectly readable, and the page shipped with a full transcription.
+        """
+        image = Image.new("RGB", (320, 120), (250, 248, 244))
+        draw = ImageDraw.Draw(image)
+        box = BBox(20, 20, 300, 100)
+        # Across the whole page, as a fold falls: a band that stopped at the block's edge
+        # would be a step, and a step is exactly what ink looks like.
+        for x in range(image.width):
+            shade = int(120 + 120 * x / image.width)
+            draw.line((x, 0, x, image.height), fill=(shade, shade, shade))
+        words = (Word("كلمة", box),)
+        region = Region(RegionType.PARAGRAPH, box, (Line("كلمة", box, words, Direction.RTL),), None, 0)
+        sample = Sample(
+            id="00000001_01",
+            image=image,
+            page=Page(320, 120, (region,), Direction.RTL),
+            provenance=Provenance(
+                seed=1,
+                template="article",
+                background="paper",
+                font_path="assets/fonts/X-Regular.ttf",
+                extra={"index": 1, "page": 1, "preset": "archive"},
+            ),
+        )
+
+        assert not MinContrast().check(sample).passed
+
+    def test_accepts_a_page_where_only_one_block_faded(self):
+        dark, faded = (10, 10, 10), (246, 244, 240)
+        sample = build_banded_sample((dark, dark, dark, faded))
+
+        assert MinContrast().check(sample).passed
 
 
 class TestBoxesInsidePage:

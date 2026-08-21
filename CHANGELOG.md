@@ -4,6 +4,61 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-13
+
+### Changed
+
+- **Degradations are about 1.6x faster on the default preset mix, and produce byte-identical
+  output.** Profiling the per-page cost — the question left open by 1.2.1 — showed
+  degradation was 75-90% of a page, and that most of it was waste rather than physics.
+  Seven degradations built their fields from `np.mgrid[0:height, 0:width]`, two full-page
+  int64 arrays (60 MB for A4 at 200 dpi) before a single arithmetic temporary, when every
+  one of those fields is either separable or depends on a single axis. `Wrinkles` also
+  computed both axes of a gradient and used one.
+
+  Per preset, 12 pages each: `photo` 4.30 → 2.42 s/page, `archive` 3.54 → 2.40,
+  `scan` 1.72 → 1.18, `fax` 1.53 → 1.03. The worst individual steps: `Folds` 1.18 → 0.33s,
+  `PageCurl` 1.45 → 0.75s, `Wrinkles` 2.17 → 1.16s.
+
+  A speed-up in a data generator is only legitimate if the data does not move, so all 38
+  degradation configurations across the four presets were hashed — pixels and serialised
+  annotation — before and after, on a fixed page and seed. All 38 identical. The
+  equivalence is a test rather than a claim: `_axes` must equal the `np.mgrid` it replaced,
+  exactly.
+
+### Fixed
+
+- **A page whose body was washed out shipped with a full transcription if any one block
+  survived.** `MinContrast` reduced its per-block measurements with `max()`, so a faded
+  archival page that kept its heading dark passed on the heading's 238 levels of contrast
+  while every paragraph under it sat at the shade of the paper. The label claimed text no
+  reader could recover. It now judges the page by the *fraction* of blocks below the
+  threshold, like `LegibleLineHeight` beside it, and rejects above half.
+
+  That alone changed nothing, because the quantity being reduced was also wrong. Contrast
+  was a 10-90 percentile spread taken across a block, which measures whatever varies within
+  it — and on a folded, stained page what varies is the shading. Text presence barely
+  entered: on one page an erased caption scored 60.0 and a perfectly readable heading 61.9.
+  Every block cleared the threshold and the page passed with nothing failing.
+
+  Contrast is now measured at stroke scale — how far ink falls below the paper immediately
+  around it, taking the local paper level from a dilation by roughly a stroke's width.
+  Smooth shading subtracts out by construction. On that same page the readable heading
+  moves to 205.2 and the erased caption to 36.0, a gap the old measure inverted. A `clean`
+  page scores 214-239 on every block at 110, 200 and 300 dpi, so the window needs no
+  scaling.
+
+  The threshold follows from that scale: at 90, `clean`, `scan` and `fax` lose nothing,
+  `photo` loses 2.9%, and `archive` loses the 25.7% of its pages that are unreadable. At
+  120 it would start discarding a fifth of `photo`, which is dark but perfectly legible.
+
+- **Tables on right-to-left pages were pinned to the left margin.** `_place_table`
+  composited at `column.x0` whatever the direction, while text in the same column ranged
+  right — so an Arabic page put its table against the left edge with every paragraph beside
+  it starting at the right. `direction` was already threaded in for cell content; it now
+  also decides where the block starts. Figures centred and text followed direction; tables
+  were the only block type that ignored it.
+
 ## [1.2.1] - 2026-08-13
 
 Both entries were found by re-running the benchmark after the 1.2.0 fixes, not by a test.
