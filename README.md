@@ -205,6 +205,39 @@ What each part means:
 A run is sharded, and a shard that finishes is left on disk complete, so re-running the same command skips
 what is already there. "The job died at 80%" is a resume rather than a restart.
 
+## From Python
+
+The CLI is a thin wrapper. The same thing from code, where the whole public surface is a
+config, a factory and a `Sample`:
+
+```python
+from ocrsmith import GenerationConfig, SampleFactory, load_config
+
+config = load_config("examples/configs/darija_scan.yaml")   # or GenerationConfig(...)
+factory = SampleFactory(config)                             # build once, reuse
+
+for sample in factory.create(0):          # one document, one sample per page
+    sample.image.save(f"{sample.id}.png")
+    print(sample.page.text)               # the label, in logical order
+    for region in sample.page.regions:    # typed blocks, in reading order
+        for line in region.lines:
+            for word in line.words:
+                print(word.text, word.bbox.as_int())
+```
+
+`SampleFactory` is the document renderer. When the renderer should follow the config's
+`render.mode`, import `build_factory` from the same place and call that instead — both
+yield the same `Sample`, so nothing else in the loop changes:
+
+```python
+from ocrsmith import build_factory
+
+factory = build_factory(config)   # SampleFactory, or the line renderer
+```
+
+To write a whole dataset rather than handle samples yourself, call `run_generation(config)`
+— it shards, parallelises, validates and writes.
+
 ## What one page gives you
 
 Everything below comes out of a single render, because it all describes the same pixels:

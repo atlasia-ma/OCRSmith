@@ -11,7 +11,7 @@ the pieces directly when you need something the config does not express.
 
 from .config import GenerationConfig, load_config
 from .domain import BBox, Line, Page, Provenance, Region, RegionType, Sample, Word
-from .pipeline import SampleFactory, iter_samples, run_generation
+from .pipeline import SampleFactory, build_factory, iter_samples, run_generation
 
 __all__ = [
     "BBox",
@@ -24,6 +24,7 @@ __all__ = [
     "Sample",
     "SampleFactory",
     "Word",
+    "build_factory",
     "iter_samples",
     "load_config",
     "run_generation",
