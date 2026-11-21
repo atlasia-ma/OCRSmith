@@ -214,3 +214,6 @@ test_output
 # under their own licences, and the manifest makes a fetch reproducible.
 assets/fonts_google/
 assets/fonts_fetched/
+# Fetched by `ocrsmith fetch-fonts --hands`. Fonts are other people's work and the
+# repository ships none of its own; the manifest records what a dataset was built with.
+assets/fonts_hands/

@@ -330,3 +330,128 @@ class TestPresets:
         first.degradations.clear()
 
         assert len(build_preset("scan")) > 0
+
+
+class TestPlanarCapture:
+    """Skew and perspective as one resample.
+
+    The reason it exists is speed — two full-page resamples were the single most
+    expensive thing in a run — but the reason it is *allowed* is that a rotation and a
+    perspective warp are both homographies and homographies compose, so the fused
+    transform is the same transform rather than an approximation of it. These tests pin
+    the part that would actually hurt if it broke: the annotation following the pixels.
+    """
+
+    def test_boxes_follow_the_warped_ink(self):
+        from ocrsmith.core.degradations import PlanarCapture
+
+        image, page = _page_with_mark()
+        rng = random.Random(5)
+
+        warped, new_page, params = PlanarCapture(max_angle=6.0, magnitude=0.05).apply(image, page, rng)
+
+        assert params["angle"] != 0.0
+        assert new_page.width == warped.width and new_page.height == warped.height
+        assert _ink_is_inside(warped, _only_box(new_page))
+
+    def test_a_pure_rotation_still_rotates(self):
+        from ocrsmith.core.degradations import PlanarCapture
+
+        image, page = _page_with_mark()
+
+        warped, _new_page, params = PlanarCapture(max_angle=8.0, magnitude=0.0).apply(
+            image, page, random.Random(1)
+        )
+
+        assert params["magnitude"] == 0.0
+        assert warped.size != image.size  # the canvas grew to hold the rotated sheet
+
+    def test_an_identity_transform_leaves_the_page_untouched(self):
+        from ocrsmith.core.degradations import PlanarCapture
+
+        image, page = _page_with_mark()
+
+        result, new_page, params = PlanarCapture(max_angle=0.0, magnitude=0.0).apply(
+            image, page, random.Random(0)
+        )
+
+        assert result is image
+        assert new_page is page
+        assert params == {"angle": 0.0, "magnitude": 0.0}
+
+    def test_boxes_stay_on_the_canvas(self):
+        from ocrsmith.core.degradations import PlanarCapture
+
+        for seed in range(12):
+            image, page = _page_with_mark()
+            warped, new_page, _ = PlanarCapture(max_angle=6.0, magnitude=0.06).apply(
+                image, page, random.Random(seed)
+            )
+            box = _only_box(new_page)
+
+            assert 0 <= box.x0 <= box.x1 <= warped.width
+            assert 0 <= box.y0 <= box.y1 <= warped.height
+
+    def test_one_resample_beats_two_for_sharpness(self):
+        """Fusing is not only faster, it interpolates once instead of twice.
+
+        A second bicubic pass over already-resampled text is a soft blur nobody asked
+        for, so the fused result must retain at least as much high-frequency detail as
+        the two-stage one it replaces.
+        """
+        import numpy as np
+
+        from ocrsmith.core.degradations import PerspectiveWarp, PlanarCapture, Rotation
+
+        def detail(image):
+            array = np.asarray(image.convert("L"), dtype=np.float32)
+            return float(np.abs(np.diff(array, axis=1)).mean())
+
+        image, page = _page_with_mark(stripes=True)
+
+        fused, _, _ = PlanarCapture(max_angle=4.0, magnitude=0.03).apply(image, page, random.Random(2))
+        staged, staged_page, _ = PerspectiveWarp(magnitude=0.03).apply(image, page, random.Random(2))
+        staged, _, _ = Rotation(max_angle=4.0).apply(staged, staged_page, random.Random(2))
+
+        assert detail(fused) >= detail(staged) * 0.95
+
+
+def _page_with_mark(stripes: bool = False):
+    """A white page with something on it, and an annotation box around that something."""
+    from PIL import ImageDraw
+
+    from ocrsmith.domain.annotations import Line, Page, Region, RegionType
+    from ocrsmith.domain.geometry import BBox
+
+    image = Image.new("RGB", (240, 180), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    if stripes:
+        for x in range(80, 160, 4):
+            draw.line((x, 60, x, 120), fill=(0, 0, 0), width=1)
+    else:
+        draw.rectangle((80, 60, 160, 120), fill=(0, 0, 0))
+    box = BBox(80, 60, 160, 120)
+    line = Line("mark", box, ())
+    page = Page(240, 180, (Region(RegionType.PARAGRAPH, box, (line,)),))
+    return image, page
+
+
+def _only_box(page):
+    return page.regions[0].lines[0].bbox
+
+
+def _ink_is_inside(image, box) -> bool:
+    """Every dark pixel sits within `box`, give or take the resampler's soft edge."""
+    import numpy as np
+
+    array = np.asarray(image.convert("L"))
+    rows, columns = np.nonzero(array < 100)
+    if not len(rows):
+        return False
+    margin = 3
+    return bool(
+        columns.min() >= box.x0 - margin
+        and columns.max() <= box.x1 + margin
+        and rows.min() >= box.y0 - margin
+        and rows.max() <= box.y1 + margin
+    )

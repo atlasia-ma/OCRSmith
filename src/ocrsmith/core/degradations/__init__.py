@@ -7,7 +7,7 @@ from .base import (
     PhotometricDegradation,
     map_page,
 )
-from .geometric import PerspectiveWarp, Rotation, perspective_coefficients
+from .geometric import PerspectiveWarp, PlanarCapture, Rotation, perspective_coefficients
 from .photometric import (
     Bleedthrough,
     Blur,
@@ -27,9 +27,10 @@ from .photometric import (
     Vignette,
 )
 from .physical import IlluminationField, PageCurl, Wrinkles
-from .presets import PRESETS, build_preset, preset_names
+from .presets import LINE_PRESETS, PRESETS, build_preset, preset_names
 
 __all__ = [
+    "LINE_PRESETS",
     "PRESETS",
     "Bleedthrough",
     "Blur",
@@ -50,6 +51,7 @@ __all__ = [
     "PageCurl",
     "PaperGrain",
     "PerspectiveWarp",
+    "PlanarCapture",
     "PhotometricDegradation",
     "Rotation",
     "Shadow",

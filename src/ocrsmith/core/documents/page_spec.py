@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from ...domain.geometry import BBox
 from ...text.script import Direction
 
-__all__ = ["PAPER_SIZES_MM", "PageSpec"]
+__all__ = ["PAPER_SIZES_MM", "PageProfile", "PageSpec"]
 
 #: Width and height in millimetres.
 PAPER_SIZES_MM: dict[str, tuple[float, float]] = {
@@ -25,9 +25,45 @@ PAPER_SIZES_MM: dict[str, tuple[float, float]] = {
     "legal": (215.9, 355.6),
     "receipt": (80.0, 200.0),
     "id_card": (85.6, 54.0),
+    "business_card": (85.0, 55.0),
+    "b5": (176.0, 250.0),
+    "broadsheet": (381.0, 578.0),
+    "tabloid": (279.0, 432.0),
 }
 
 _MM_PER_INCH = 25.4
+
+
+@dataclass(frozen=True, slots=True)
+class PageProfile:
+    """The physical conventions of one kind of document.
+
+    Page size, column count, margins and type size are not independent choices - they are
+    four consequences of what the document *is*. Sampling them separately is what puts a
+    chapter of prose on a till receipt and sets a business card in nine point: nothing in
+    the sampler knew the two decisions were related, because nothing owned both.
+
+    A profile is that owner. Randomness still varies everything inside it - a receipt is
+    not always the same length, an invoice not always the same margin - but it varies
+    within what the type allows rather than across all types at once.
+
+    Type size is given in **points**, not pixels, because a point is a physical size and a
+    pixel is not: 10 pt body text is 10 pt whether the page was captured at 150 dpi or 300.
+    """
+
+    #: Paper name to weight; keys must exist in `PAPER_SIZES_MM`.
+    papers: dict[str, float]
+    #: Column count to weight.
+    columns: dict[int, float]
+    #: Margin as a fraction of the sheet's short edge, sampled per document.
+    margin_ratio: tuple[float, float] = (0.06, 0.11)
+    #: Body type size in points.
+    body_pt: tuple[float, float] = (9.0, 12.0)
+    landscape_probability: float = 0.0
+    header_probability: float = 0.0
+    footer_probability: float = 0.0
+    #: Line spacing multiplier band, relative to the face's own line height.
+    leading: tuple[float, float] = (0.95, 1.20)
 
 
 @dataclass(frozen=True, slots=True)

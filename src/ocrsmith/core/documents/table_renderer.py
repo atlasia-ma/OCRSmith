@@ -44,6 +44,10 @@ class TableStyle:
     cell_padding: int = 8
     header_fill: tuple[int, int, int] | None = None
     zebra_fill: tuple[int, int, int] | None = None
+    #: Widen the columns until the table spans the measure it was given. Off means the
+    #: table is only as wide as its content needs, which is right for a small inset table
+    #: and wrong for the item table that *is* the document.
+    stretch: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,8 +100,15 @@ class TableRenderer:
         height = int(round(sum(row_heights))) + style.border_width
         image = Image.new("RGBA", (max(1, width), max(1, height)), (0, 0, 0, 0))
 
-        x_edges = self._edges(col_widths, direction, total=width)
-        y_edges = self._edges(row_heights, Direction.LTR, total=height)
+        # Mirrored about the last drawable column, not about the image width. `width` is
+        # `sum(col_widths) + border_width`, so mirroring about it put the far edge of an
+        # RTL table at x == width - one pixel past the canvas - and the rule drawn there
+        # landed nowhere. Every Arabic table has been missing one of its two outer verticals,
+        # which is why they read as a stack of rows rather than as a grid. It also shifted
+        # every RTL cell box by the border width, so the annotation moves back into place
+        # with it.
+        x_edges = self._edges(col_widths, direction, total=width - style.border_width)
+        y_edges = self._edges(row_heights, Direction.LTR, total=height - style.border_width)
 
         self._fill_rows(image, table, style, x_edges, y_edges)
         self._draw_borders(image, table, style, x_edges, y_edges)
@@ -124,11 +135,22 @@ class TableRenderer:
             natural[cell.col] = max(natural[cell.col], metrics.line_advance(cell.text) + padding)
 
         total = sum(natural)
-        if total <= max_width or total <= 0:
+        if total <= 0:
             return natural
-        scale = max_width / total
-        floor = padding
-        return [max(floor, width * scale) for width in natural]
+        if total > max_width:
+            scale = max_width / total
+            return [max(padding, width * scale) for width in natural]
+
+        # Narrower than the measure it sits in. A document's table spans its text column -
+        # a ruled box two thirds as wide as the paragraph above it, shunted to whichever
+        # margin the script starts from, is not a layout any typesetter produces. The slack
+        # is handed to the columns in proportion to what they already need, so the widest
+        # column (a description, usually) absorbs most of it and a quantity column stays
+        # narrow.
+        if style.stretch and max_width > 0:
+            slack = max_width - total
+            return [width + slack * (width / total) for width in natural]
+        return natural
 
     def _wrap_cells(
         self, table: Table, metrics: FontMetrics, style: TableStyle, col_widths: list[float]

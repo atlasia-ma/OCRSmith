@@ -4,7 +4,7 @@ from .charts import Chart, ChartKind, ChartRenderer, ChartSeries, sample_chart
 from .content import ContentBlock, DocumentBuilder, DocumentContent
 from .flow import DocumentRenderer, RenderedPage
 from .formulas import FormulaRenderer, choose_math_font, sample_formula
-from .page_spec import PAPER_SIZES_MM, PageSpec
+from .page_spec import PAPER_SIZES_MM, PageProfile, PageSpec
 from .table_renderer import BorderStyle, RenderedTable, TableRenderer, TableStyle
 from .templates import (
     ArticleTemplate,

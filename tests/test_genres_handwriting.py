@@ -112,8 +112,25 @@ class TestNotes:
 class TestHandwrittenTypography:
     def test_handwriting_faces_are_detected_by_name(self):
         assert _looks_handwritten("ArefRuqaa")
-        assert _looks_handwritten("NotoKufiArabic")
+        assert _looks_handwritten("PlaypenSansArabic")
+        assert _looks_handwritten("NotoNastaliqUrdu")
         assert not _looks_handwritten("IBMPlexSansArabic")
+
+    def test_kufi_is_not_handwriting(self):
+        """Kufi is the angular, geometric, architectural Arabic script.
+
+        `kufi` was in the hint list, so `NotoKufiArabic` was the only "handwriting"
+        family in the bundled pool — which meant every page the generator set as
+        handwritten was set in a monumental display face.
+        """
+        assert not _looks_handwritten("NotoKufiArabic")
+        assert not _looks_handwritten("ReemKufi")
+        assert not _looks_handwritten("Kufam")
+
+    def test_display_faces_are_not_handwriting(self):
+        """Lalezar, Marhey and Qahiri were hinted as hands and are poster faces."""
+        for name in ("Lalezar", "Marhey", "Qahiri", "Handjet"):
+            assert not _looks_handwritten(name), name
 
     def test_a_handwritten_page_gets_baseline_and_gap_jitter(self):
         sampler = TypographySampler(sorted(FONT_DIR.glob("*.ttf")), body_size_range=(18, 20))
@@ -131,12 +148,15 @@ class TestHandwrittenTypography:
         if not sampler.handwriting_families:
             pytest.skip("no handwriting-like family in the bundled fonts")
 
-        names = {
+        # Compared on the *family*, not the file stem: a stem carries a weight suffix
+        # ("Mirza-Regular") and the family is what is classified.
+        families = {family.name for family in sampler.handwriting_families}
+        chosen = {
             Path(sampler.sample(random.Random(seed), handwritten=True).body.font.path).stem
             for seed in range(6)
         }
 
-        assert all(_looks_handwritten(name) for name in names)
+        assert all(any(stem.startswith(family) for family in families) for stem in chosen)
 
     def test_it_falls_back_gracefully_when_no_handwriting_face_exists(self):
         sampler = TypographySampler(

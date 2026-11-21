@@ -1,0 +1,66 @@
+# Documents supplied as Markdown, laid out across every surface and capture condition
+# the generator knows. Deliberately at the noisy end of every distribution: the point is
+# to see how far the variation goes, not to produce a balanced training corpus.
+#
+# Note what is NOT varied here: the words. Every page draws real Arabic prose from a real
+# document, so structure and meaning stay intact while everything around them moves.
+
+seed: 20260826
+
+fonts:
+  paths: ["assets/fonts_google"]
+  size_range: [16, 32]
+  require_full_coverage: true
+
+text:
+  mode: documents
+  format: markdown
+  source:
+    type: csv
+    path: assets/text_data/arabic_markdown.csv
+    column: text
+  direction: rtl
+  chunk:
+    max_chars: [350, 2400]
+    max_blocks: [2, 12]
+  diacritics:
+    mode: mixed
+
+page:
+  # Eight surfaces, from a poster-sized A3 down to an ID card.
+  papers:
+    a4: 5.0
+    a5: 2.5
+    a3: 1.0
+    a6: 1.0
+    letter: 2.0
+    legal: 1.0
+    receipt: 1.5
+    id_card: 1.0
+  dpi_range: [110, 240]
+  margin_mm_range: [6.0, 32.0]
+  columns: { 1: 4.0, 2: 2.0, 3: 0.8 }
+  landscape_probability: 0.25
+  header_probability: 0.45
+  footer_probability: 0.5
+  max_pages: 1
+  background:
+    kinds: { paper: 3.0, solid: 1.5, gradient: 1.0 }
+
+degradations:
+  presets:
+    clean: 1.5
+    scan: 2.5
+    photo: 2.5
+    fax: 1.0
+    archive: 1.5
+
+output:
+  dir: outputs/md_random
+  format: jsonl
+  image_format: png
+  shard_size: 20
+
+run:
+  num_samples: 120
+  workers: 6

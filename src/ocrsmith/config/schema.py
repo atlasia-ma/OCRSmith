@@ -24,8 +24,10 @@ __all__ = [
     "DiacriticsConfig",
     "FontConfig",
     "GenerationConfig",
+    "LineConfig",
     "OutputConfig",
     "PageConfig",
+    "RenderConfig",
     "QualityConfig",
     "RunConfig",
     "TemplateConfig",
@@ -119,12 +121,64 @@ class NormalizationConfig(BaseModel):
     collapse_whitespace: bool = True
 
 
+class ChunkConfig(BaseModel):
+    """How a supplied document is cut into surface-sized pieces.
+
+    A page holds what a page holds, so a long source document must be chunked before it
+    is laid out or everything past the first surface is discarded. Both budgets are
+    ranges sampled per document, because a corpus of identically-sized pages teaches a
+    model the size rather than the text.
+    """
+
+    max_chars: IntRange = (500, 2200)
+    max_blocks: IntRange = (3, 14)
+
+    @field_validator("max_chars", "max_blocks")
+    @classmethod
+    def _ordered_and_positive(cls, value: IntRange) -> IntRange:
+        low, high = value
+        if low < 1 or high < 1:
+            raise ValueError("chunk budgets must be positive")
+        return (min(low, high), max(low, high))
+
+
 class TextConfig(BaseModel):
     source: TextSourceConfig = Field(default_factory=TextSourceConfig)
     diacritics: DiacriticsConfig = Field(default_factory=DiacriticsConfig)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     #: "auto" reads the direction from the text itself.
     direction: Literal["auto", "rtl", "ltr"] = "auto"
+    #: "sentences" invents documents from a sentence pool via the template registry;
+    #: "documents" lays out the supplied text itself, parsed by an input adapter.
+    mode: Literal["sentences", "documents"] = "sentences"
+    #: Which adapter reads the source in "documents" mode. Sniffing is a convenience:
+    #: prose containing dashed lists is indistinguishable from Markdown, so state it.
+    format: Literal["auto", "plain", "markdown"] = "auto"
+    chunk: ChunkConfig = Field(default_factory=ChunkConfig)
+
+
+class CaptureConfig(BaseModel):
+    """Whether the capture caught the whole sheet, and which part of it if not.
+
+    Real scans are often partial - a sheet fed crooked loses its foot, a phone photo
+    catches the top two thirds. A corpus of nothing but complete pages teaches a model
+    that pages always end where the text does.
+    """
+
+    partial_probability: float = Field(default=0.0, ge=0.0, le=1.0)
+    #: Which part of the sheet the capture caught.
+    modes: dict[str, float] = Field(default_factory=lambda: {"top": 2.0, "bottom": 1.5, "middle": 1.0})
+    #: Fraction of the page height kept.
+    keep_range: tuple[float, float] = (0.4, 0.85)
+
+    @model_validator(mode="after")
+    def _usable(self) -> CaptureConfig:
+        if self.partial_probability and not any(w > 0 for w in self.modes.values()):
+            raise ValueError("partial captures need at least one mode with a positive weight")
+        low, high = self.keep_range
+        if not (0.0 < low <= high <= 1.0):
+            raise ValueError("keep_range must lie in (0, 1] and be ordered")
+        return self
 
 
 class BackgroundConfig(BaseModel):
@@ -150,22 +204,32 @@ class BackgroundConfig(BaseModel):
 class PageConfig(BaseModel):
     """Page geometry, sampled per document."""
 
-    papers: dict[str, float] = Field(default_factory=lambda: {"a4": 4.0, "a5": 1.0, "letter": 1.0})
+    #: `None` on any of these means "whatever this kind of document normally is" - the
+    #: page profile of the sampled genre decides, so a receipt comes out as an 80 mm roll
+    #: in one column and a newspaper as a broadsheet in five, without either being written
+    #: down here. Setting a value states a requirement and overrides the genre.
+    #:
+    #: Expressed as an explicit `None` rather than by asking pydantic which fields the user
+    #: supplied, because `model_fields_set` does not survive `model_dump()` - the config is
+    #: re-validated inside every worker process, where every field then looks explicitly
+    #: set. A run with four workers would have diverged from the same run with one.
+    papers: dict[str, float] | None = None
     dpi_range: IntRange = (110, 200)
-    margin_mm_range: FloatRange = (12.0, 28.0)
-    columns: dict[int, float] = Field(default_factory=lambda: {1: 3.0, 2: 1.0})
-    landscape_probability: float = Field(default=0.05, ge=0.0, le=1.0)
-    header_probability: float = Field(default=0.35, ge=0.0, le=1.0)
-    footer_probability: float = Field(default=0.45, ge=0.0, le=1.0)
+    margin_mm_range: FloatRange | None = None
+    columns: dict[int, float] | None = None
+    landscape_probability: float | None = Field(default=None, ge=0.0, le=1.0)
+    header_probability: float | None = Field(default=None, ge=0.0, le=1.0)
+    footer_probability: float | None = Field(default=None, ge=0.0, le=1.0)
     background: BackgroundConfig = Field(default_factory=BackgroundConfig)
+    capture: CaptureConfig = Field(default_factory=CaptureConfig)
     #: Hard ceiling on how many pages one document may occupy.
     max_pages: int = Field(default=3, ge=1)
 
     @model_validator(mode="after")
     def _weights_are_usable(self) -> PageConfig:
-        if not any(weight > 0 for weight in self.papers.values()):
+        if self.papers is not None and not any(weight > 0 for weight in self.papers.values()):
             raise ValueError("at least one paper size must have a positive weight")
-        if not any(weight > 0 for weight in self.columns.values()):
+        if self.columns is not None and not any(weight > 0 for weight in self.columns.values()):
             raise ValueError("at least one column count must have a positive weight")
         return self
 
@@ -225,6 +289,49 @@ class OutputConfig(BaseModel):
     eval_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
 
 
+class LineConfig(BaseModel):
+    """Shape of a recognition strip, for `render.mode: line`.
+
+    A strip is described by how tall its *text* is rather than how tall the image is,
+    because text height is the quantity a recogniser is trained against and the quantity
+    a real crop preserves. The image follows from it plus the margins.
+    """
+
+    #: Height of the line box in pixels. The usual target for a recognition model is
+    #: 32-48 px; the range runs wider so a corpus also contains strips a model must
+    #: rescale, which is what it will get from a real detector.
+    text_height_range: IntRange = (24, 64)
+    #: Words per strip. One-word strips matter — they are most of what a detector emits
+    #: for forms, tables and captions — and long ones teach the model to use context.
+    words_range: IntRange = (1, 9)
+    #: Horizontal and vertical margin around the text, sampled per edge so strips are not
+    #: all symmetric. A real crop never is.
+    pad_x_range: IntRange = (6, 40)
+    pad_y_range: IntRange = (5, 18)
+    #: Chance a strip clips a sliver of the line above or below, as a real crop does.
+    #: Drawn into the margins and deliberately absent from the label.
+    neighbour_probability: float = Field(default=0.35, ge=0.0, le=1.0)
+    #: Ink colours, weighted. Documents are not all printed in pure black, and a model
+    #: trained as if they were binarises badly on blue ballpoint and faded toner.
+    inks: dict[str, float] = Field(
+        default_factory=lambda: {"black": 6.0, "near_black": 4.0, "grey": 1.5, "blue": 1.5}
+    )
+
+
+class RenderConfig(BaseModel):
+    """Which renderer produces a sample.
+
+    `document` lays out a whole page and yields one sample per page: the richer output,
+    with regions, reading order, tables and per-word boxes in a real layout.
+
+    `line` draws single recognition strips directly, roughly three orders of magnitude
+    fewer pixels per sample. Use it when what you are training is a recogniser and the
+    layout is somebody else's problem.
+    """
+
+    mode: Literal["document", "line"] = "document"
+
+
 class QualityConfig(BaseModel):
     """Whether generated samples are checked before they reach the dataset."""
 
@@ -253,6 +360,8 @@ class GenerationConfig(BaseModel):
     fonts: FontConfig = Field(default_factory=FontConfig)
     text: TextConfig = Field(default_factory=TextConfig)
     page: PageConfig = Field(default_factory=PageConfig)
+    render: RenderConfig = Field(default_factory=RenderConfig)
+    line: LineConfig = Field(default_factory=LineConfig)
     templates: TemplateConfig = Field(default_factory=TemplateConfig)
     degradations: DegradationConfig = Field(default_factory=DegradationConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)

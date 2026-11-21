@@ -8,6 +8,7 @@ Hugging Face corpus or a fixed list in a test, and keeps the templates readable.
 from __future__ import annotations
 
 import random
+import re
 from collections.abc import Iterable, Sequence
 from typing import Protocol, runtime_checkable
 
@@ -62,9 +63,32 @@ class FieldGenerator:
             return self._digits(f"{day} {self._MONTHS_AR[month - 1]} {year}")
         return self._digits(f"{year}-{month:02d}-{day:02d}")
 
-    def amount(self, rng: random.Random) -> str:
+    def amount(self, rng: random.Random, currency: str | None = None) -> str:
+        """One money amount. `currency` fixes the unit for a whole document.
+
+        A single invoice quoting one line in dirhams, the next in euros and its total in
+        dollars is not a document anyone has ever been handed - real paper commits to a
+        unit at the top and keeps it. The caller passes the unit it drew once, rather than
+        each amount drawing its own.
+        """
         value = f"{rng.uniform(1, 99999):,.2f}"
-        return self._digits(f"{value} {rng.choice(self._CURRENCIES)}")
+        return self._digits(f"{value} {currency or rng.choice(self._CURRENCIES)}")
+
+    def currency(self, rng: random.Random) -> str:
+        """The unit a document quotes its money in, drawn once per document."""
+        return rng.choice(self._CURRENCIES)
+
+    def money(self, rng: random.Random, value: float, currency: str) -> str:
+        """A specific amount in a fixed unit, so a table's arithmetic can hold together."""
+        return self._digits(f"{value:,.2f} {currency}")
+
+    def digits(self, text: str) -> str:
+        """Text passed through the configured numeral system, formatted by the caller."""
+        return self._digits(text)
+
+    def plain_number(self, value: int | float, decimals: int = 0) -> str:
+        """A bare quantity - no unit, no currency."""
+        return self._digits(f"{value:,.{decimals}f}")
 
     def code(self, rng: random.Random) -> str:
         """A reference or serial: the case with no language model to fall back on."""
@@ -79,8 +103,12 @@ class FieldGenerator:
     def percentage(self, rng: random.Random) -> str:
         return self._digits(f"{rng.uniform(0, 100):.1f}%")
 
-    def any_field(self, rng: random.Random) -> str:
-        return rng.choice([self.date, self.amount, self.code, self.phone, self.percentage])(rng)
+    def any_field(self, rng: random.Random, currency: str | None = None) -> str:
+        """One arbitrary non-prose value. `currency` keeps a document's money consistent."""
+        pick = rng.choice(["date", "amount", "code", "phone", "percentage"])
+        if pick == "amount":
+            return self.amount(rng, currency)
+        return getattr(self, pick)(rng)
 
 
 @runtime_checkable
@@ -106,12 +134,46 @@ class CorpusTextProvider:
 
     _SENTENCE_ENDS = ".!?؟۔،\n"
 
-    def __init__(self, texts: Iterable[str], *, min_words: int = 3):
+    #: Markup that must never reach a rendered page. A corpus stored as Markdown is text
+    #: *plus* instructions for setting it, and only the text is the document: drawing
+    #: "## العنوان" puts two hashes on the paper and then claims them as ground truth, so a
+    #: model learns that Arabic headings begin with punctuation they have never worn. The
+    #: same corpus is parsed properly in "documents" mode, where an adapter turns the
+    #: markers into structure. Here the sentences are borrowed only for their language, so
+    #: the markers are noise.
+    #: Anchored to whitespace rather than to line starts. The corpus reaches this class
+    #: already whitespace-collapsed, so a heading that began its own line arrives mid-string
+    #: as "... كاملة. ## جمع" - a `^` anchor matched none of it, and the markers sailed
+    #: through onto the page. Nothing here is legitimate Arabic prose in these positions.
+    _MARKUP = re.compile(
+        r"(?:(?<=^)|(?<=\s))#{1,6}(?=\s)"  # ATX heading markers
+        r"|(?:(?<=^)|(?<=\s))>(?=\s)"  # block quotes
+        r"|(?:(?<=^)|(?<=\s))\d+[.)](?=\s)"  # ordered-list markers
+        r"|(?:(?<=^)|(?<=\s))[-*+](?=\s)"  # bullets
+        r"|-{3,}"  # horizontal and table rules
+        r"|\|"  # table cell separators
+        r"|\*{1,3}"  # bold / italic markers
+        r"|`+"  # code spans
+        r"|~~",  # strikethrough
+        re.MULTILINE,
+    )
+    #: Collapses the gaps left behind once markers are removed.
+    _SPACES = re.compile(r"[ \t]{2,}")
+    #: A link becomes its visible text; the target is not on the page.
+    _LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+
+    def __init__(self, texts: Iterable[str], *, min_words: int = 3, strip_markup: bool = True):
         self._sentences: list[str] = []
         for text in texts:
-            self._sentences.extend(self._split(str(text), min_words))
+            cleaned = self._plain(str(text)) if strip_markup else str(text)
+            self._sentences.extend(self._split(cleaned, min_words))
         if not self._sentences:
             raise ValueError("CorpusTextProvider needs at least one usable sentence")
+
+    @classmethod
+    def _plain(cls, text: str) -> str:
+        """The document's words, with the instructions for setting them removed."""
+        return cls._SPACES.sub(" ", cls._MARKUP.sub(" ", cls._LINK.sub(r"\1", text)))
 
     @classmethod
     def _split(cls, text: str, min_words: int) -> list[str]:

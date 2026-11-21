@@ -1,0 +1,81 @@
+# Recognition strips at line speed.
+#
+# One sample is one line crop, not a page. Roughly 88 strips per second per core against
+# 1.5 pages per second, because a strip is about a thousandth of the pixels of an A4 page
+# at 200 dpi - so this is the config to reach for when what you are training is a
+# recogniser and the layout is somebody else's problem.
+#
+#   ocrsmith generate -c examples/configs/recognition_lines.yaml -n 500000 -w 12
+#
+# Everything a page corpus gets, a strip corpus still gets: coverage-checked fonts, real
+# paper, named capture conditions, exact per-word boxes and a logical-order label.
+
+seed: 20260
+render:
+  mode: line
+
+fonts:
+  paths: ["assets/fonts"]
+  require_full_coverage: true
+
+text:
+  source:
+    # Point this at your own corpus. The bundled Darija sentences are here so the config
+    # runs from a fresh clone; a real recogniser needs far more vocabulary than this.
+    type: csv
+    path: assets/text_data/sentences.csv
+    column: darija_ar
+    limit: 40000
+  diacritics:
+    mode: mixed
+  direction: rtl
+
+line:
+  # 32-48 px is the usual recognition input. The range goes wider on purpose: a detector
+  # will hand the model boxes it has to rescale, and a corpus set at one height teaches it
+  # to rely on a scale it will not always get.
+  text_height_range: [28, 72]
+  # Short crops matter most. A single word from a form field or a table cell is where a
+  # recogniser has no language prior to fall back on, and it is most of what a detector
+  # actually emits.
+  words_range: [1, 8]
+  pad_x_range: [5, 44]
+  pad_y_range: [4, 20]
+  neighbour_probability: 0.4
+
+page:
+  # Only the background section is read in line mode: it supplies the stock a strip is
+  # cut from. The rest of `page` describes a sheet, and there is no sheet here.
+  background:
+    kinds:
+      paper: 4.0
+      solid: 1.5
+      gradient: 0.4
+      image: 0.0
+
+degradations:
+  # Same names as the page presets, at crop scale - the skew is what survives a deskew
+  # pass and the perspective is the residue of an uncorrected one, because what reaches a
+  # recogniser has already been through a detector.
+  presets:
+    clean: 1.0
+    scan: 4.0
+    photo: 3.0
+    fax: 1.0
+    archive: 1.0
+
+quality:
+  enabled: true
+
+output:
+  dir: outputs/lines
+  format: jsonl
+  image_format: jpeg
+  image_quality: 92
+  # A strip is small, so a shard can hold many more of them than it would pages. Keep
+  # `shard_size` near `num_samples / workers`: a shard is the unit of parallelism.
+  shard_size: 20000
+
+run:
+  num_samples: 100000
+  workers: 12

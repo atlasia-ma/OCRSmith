@@ -16,6 +16,7 @@ from ocrsmith.core.degradations import (
     PageCurl,
     Wrinkles,
     build_preset,
+    preset_names,
 )
 from ocrsmith.core.degradations.photometric import _axes
 from ocrsmith.domain import BBox, Line, Page, Region, RegionType, Word
@@ -175,12 +176,29 @@ class TestPresets:
     def test_photo_now_models_an_uneven_surface(self):
         names = {type(d).__name__ for d in build_preset("photo").degradations}
 
-        assert {"PageCurl", "Wrinkles", "IlluminationField"} <= names
+        assert {"PageCurl", "IlluminationField"} <= names
 
-    def test_archive_wrinkles_its_paper(self):
-        names = {type(d).__name__ for d in build_preset("archive").degradations}
+    def test_no_preset_ripples_the_text(self):
+        """`Wrinkles` is kept but deliberately unused.
 
-        assert "Wrinkles" in names
+        Its local displacement reads as a wobble in the letterforms rather than as a
+        crease in the paper, which looks synthetic in exactly the way this project exists
+        to avoid. The class stays available for anyone who wants it; no preset reaches
+        for it, and this test is what keeps it that way.
+        """
+        for name in preset_names():
+            names = {type(d).__name__ for d in build_preset(name).degradations}
+
+            assert "Wrinkles" not in names, f"{name} reintroduced the ripple"
+
+    def test_wrinkles_still_works_when_asked_for_explicitly(self, striped_page):
+        image, page = striped_page
+
+        result, new_page, _ = Wrinkles(strength=(3.0, 3.0), probability=1.0).apply(
+            image, page, random.Random(4)
+        )
+
+        assert (new_page.width, new_page.height) == result.size
 
     @pytest.mark.parametrize("name", ["photo", "archive"])
     def test_presets_keep_the_annotation_consistent(self, name, striped_page):

@@ -1,6 +1,11 @@
-# src/ocrsmith/datasets/loaders/ParquetTextLoader.py
+"""Reading a corpus out of a Parquet file.
 
-import pandas as pd
+`pandas` is imported inside the functions that need it, not at module scope. It is an
+optional dependency — `ocrsmith[data]` — and a top-level import made `import ocrsmith`
+itself fail on a base install, because the package imports the pipeline, which imports
+the writers, which imported every loader. A plain `pip install ocrsmith` produced a
+package whose own `--help` crashed.
+"""
 
 from .base import BaseTextDataLoader
 
@@ -13,6 +18,8 @@ class ParquetTextLoader(BaseTextDataLoader):
 
     def load_texts(self, parquet_path, **kwargs):
         try:
+            import pandas as pd
+
             df = pd.read_parquet(parquet_path)
         except FileNotFoundError:
             raise FileNotFoundError(f"Parquet file not found: {parquet_path}") from None

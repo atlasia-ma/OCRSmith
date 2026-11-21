@@ -1,6 +1,7 @@
-"""Generation pipeline: seeds in, annotated pages out."""
+"""Generation pipeline: seeds in, annotated samples out."""
 
-from .factory import SampleFactory, build_text_provider
+from .factory import SampleFactory, build_factory, build_text_provider, corpus_advice
+from .line_factory import LineSampleFactory
 from .runner import (
     GenerationResult,
     ShardPlan,
@@ -14,9 +15,12 @@ from .runner import (
 
 __all__ = [
     "GenerationResult",
+    "LineSampleFactory",
     "SampleFactory",
     "ShardPlan",
+    "build_factory",
     "build_text_provider",
+    "corpus_advice",
     "iter_samples",
     "effective_workers",
     "parallelism_advice",

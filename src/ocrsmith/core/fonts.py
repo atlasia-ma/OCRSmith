@@ -19,7 +19,12 @@ from pathlib import Path
 from PIL import ImageFont
 from PIL.ImageFont import FreeTypeFont
 
-from ..text.coverage import fonts_supporting, supports_text
+from ..text.coverage import (
+    drawable_codepoints,
+    required_codepoints,
+    supports_text,
+    warm_coverage_cache,
+)
 from ..text.shaping import TextShaper, resolve_shaper
 
 __all__ = ["FontPool", "clear_font_cache", "discover_fonts", "font_variations", "load_font"]
@@ -96,6 +101,19 @@ def discover_fonts(
     return tuple(dict.fromkeys(path for path in found if keep(path)))
 
 
+def _coverage_or_none(face: Path) -> frozenset[int] | None:
+    """A face's drawable code points, or None if its container cannot be read.
+
+    An unreadable font is dropped from the pool's coverage index rather than raising:
+    a directory of a hundred faces picked up from a system font path will occasionally
+    contain one bitmap-only or malformed file, and that is not a reason to fail a run.
+    """
+    try:
+        return drawable_codepoints(face)
+    except Exception:
+        return None
+
+
 class FontPool:
     """The set of faces available to a run, with coverage-aware selection."""
 
@@ -117,6 +135,20 @@ class FontPool:
         # will use.
         self.shaper = shaper or resolve_shaper()
         self._coverage_cache: dict[tuple[str, str], bool] = {}
+        # Read every face's drawable code points now, once, and keep them beside the
+        # `Path` they belong to. Each answer is cached on disk, so this is ~50 ms per
+        # *new* face and a few milliseconds per run thereafter — but doing it lazily
+        # charges it to whichever sample asks first, in every worker, and that is what
+        # used to make coverage the slowest stage in a run.
+        #
+        # Holding the sets here rather than looking them up per query matters too: a line
+        # run asks "which of these hundred faces can draw this?" once per sample, and
+        # going through `drawable_codepoints` each time meant rebuilding a hundred `Path`
+        # objects per sample just to reach a memo. That was a fifth of the line pipeline.
+        warm_coverage_cache(self.faces)
+        self._drawable: tuple[tuple[Path, frozenset[int]], ...] = tuple(
+            (face, coverage) for face in self.faces if (coverage := _coverage_or_none(face)) is not None
+        )
 
     def __len__(self) -> int:
         return len(self.faces)
@@ -125,8 +157,10 @@ class FontPool:
         """Faces that can draw `text`, honouring the pool's coverage requirement."""
         if not self.require_full_coverage:
             return self.faces
-        eligible = fonts_supporting(self.faces, self._probe(text))
-        return tuple(Path(path) for path in eligible)
+        needed = required_codepoints(self._probe(text))
+        if not needed:
+            return self.faces
+        return tuple(face for face, drawable in self._drawable if needed <= drawable)
 
     def choose(self, text: str, rng: random.Random) -> Path:
         """Pick a face that can draw `text`.
@@ -138,8 +172,10 @@ class FontPool:
         eligible = self.supporting(text)
         if eligible:
             return rng.choice(eligible)
-        probe = self._probe(text)
-        return max(self.faces, key=lambda path: supports_text(path, probe).ratio)
+        needed = required_codepoints(self._probe(text))
+        if not needed or not self._drawable:
+            return self.faces[0]
+        return max(self._drawable, key=lambda item: len(needed & item[1]))[0]
 
     def covers(self, path: str | Path, text: str) -> bool:
         key = (str(path), self._probe(text))

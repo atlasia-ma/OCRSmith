@@ -101,8 +101,16 @@ class DocumentRenderer:
         table_style: TableStyle | None = None,
         rng: random.Random | None = None,
         max_pages: int = 8,
+        overflow: list[ContentBlock] | None = None,
     ) -> Iterator[RenderedPage]:
-        """Stream pages as they are composed, so long documents never sit in memory whole."""
+        """Stream pages as they are composed, so long documents never sit in memory whole.
+
+        Blocks that never reached a surface are appended to `overflow` when one is given.
+        The annotation already describes only what was drawn, so a truncated document is
+        correctly labelled either way — but a corpus builder feeding whole documents in
+        needs to see that they are arriving in pieces rather than infer it from a word
+        count, so the discarded remainder is reported rather than silently dropped.
+        """
         rng = rng or random.Random()
         direction = spec.direction if spec.direction.is_rtl else content.direction
         pending: list[ContentBlock] = [b for b in content.blocks if b.type is not RegionType.HEADER]
@@ -135,12 +143,17 @@ class DocumentRenderer:
                 # a blank image with a confident label, and keeping the block would loop
                 # until max_pages; dropping it is the only honest option.
                 if pending:
+                    if overflow is not None:
+                        overflow.append(pending[0])
                     pending.pop(0)
                 continue
 
             page_number += 1
             page = Page(spec.width, spec.height, tuple(regions), direction).clipped()
             yield RenderedPage(image, page, page_number)
+
+        if overflow is not None:
+            overflow.extend(pending)
 
     # -- page composition --------------------------------------------------
 
@@ -296,6 +309,13 @@ class DocumentRenderer:
         ]
         if not lines:
             return (None, role.space_after, None)
+
+        # A line still wider than its column means a single unbreakable word does not fit,
+        # so this column is narrower than the text it was handed. Drawing it anyway spills
+        # ink past the column edge; the block is declined instead, and if nothing on the
+        # page can be placed the page is not produced at all.
+        if any(metrics.line_advance(line) > column.width for line in lines):
+            return None
 
         if len(lines) > capacity:
             # Orphan control: one line of a paragraph stranded at the foot of a column

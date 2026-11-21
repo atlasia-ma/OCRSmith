@@ -1,0 +1,60 @@
+# A showcase corpus in Modern Standard Arabic, for sample sheets and README figures.
+# conditions and page geometry. Built for sample sheets and README figures,
+# not for training — the genre mix here is deliberately flatter than a real
+# corpus would be.
+
+seed: 20260826
+
+fonts:
+  paths: ["assets/fonts_google"]
+  size_range: [18, 34]
+  require_full_coverage: true
+
+text:
+  source:
+    type: csv
+    path: assets/text_data/arabic_msa.csv
+    column: text
+    limit: 5000
+  direction: rtl
+
+page:
+  papers: { a4: 4.0, a5: 1.5 }
+  dpi_range: [130, 220]
+  margin_mm_range: [12.0, 30.0]
+  columns: { 1: 3.0, 2: 1.5 }
+  header_probability: 0.35
+  footer_probability: 0.45
+  max_pages: 1
+
+templates:
+  weights:
+    article: 3.0
+    report: 2.0
+    newspaper: 1.5
+    paper: 1.5
+    letter: 1.0
+    form: 1.0
+    invoice: 1.0
+    contents: 0.8
+    slide: 0.8
+    notes: 1.0
+
+degradations:
+  presets:
+    clean: 2.0
+    scan: 3.0
+    photo: 2.0
+    fax: 1.0
+    archive: 1.5
+
+output:
+  dir: outputs/showcase_ar
+  format: jsonl
+  image_format: png
+  # 100 samples / 6 workers -> 6 shards, so every worker gets one.
+  shard_size: 17
+
+run:
+  num_samples: 100
+  workers: 6

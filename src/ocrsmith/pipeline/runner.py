@@ -26,7 +26,7 @@ from ..config.schema import GenerationConfig
 from ..datasets.writers import build_sink
 from ..domain import Sample
 from ..quality import default_validators
-from .factory import SampleFactory
+from .factory import SampleFactory, build_factory
 
 __all__ = ["GenerationResult", "ShardPlan", "iter_samples", "plan_shards", "run_generation"]
 
@@ -98,7 +98,7 @@ def iter_samples(
     end a twelve-hour job — but a run of consecutive failures aborts, because that means
     the configuration is wrong rather than the data unlucky.
     """
-    factory = factory or SampleFactory(config)
+    factory = factory or build_factory(config)
     if indices is None:
         indices = range(config.run.start_index, config.run.start_index + config.run.num_samples)
 
@@ -131,7 +131,7 @@ def run_shard(config: GenerationConfig, plan: ShardPlan) -> dict:
     if marker.exists():
         return {"shard": plan.index, "pages": 0, "documents": 0, "rejected": {}, "skipped": True}
 
-    factory = SampleFactory(config)
+    factory = build_factory(config)
     sink = build_sink(
         config.output.format,
         directory,
@@ -140,7 +140,10 @@ def run_shard(config: GenerationConfig, plan: ShardPlan) -> dict:
         image_quality=config.output.image_quality,
         images_subdir=config.output.images_subdir,
     )
-    gate = default_validators() if config.quality.enabled else None
+    # The gate has to match the renderer: a check calibrated for a page is not a
+    # conservative choice on a strip, it is a different check. See `default_validators`.
+    scale = "line" if config.render.mode == "line" else "page"
+    gate = default_validators(scale) if config.quality.enabled else None
 
     pages = 0
     rejected: Counter[str] = Counter()

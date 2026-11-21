@@ -22,9 +22,28 @@ __all__ = ["break_long_word", "fit_lines", "wrap_paragraph", "wrap_text"]
 Measure = Callable[[str], float]
 
 
+def _is_connected_script(word: str) -> bool:
+    """Whether the word is written in a script whose letters join.
+
+    Arabic, Syriac, Nko and the Arabic-derived blocks. Latin, digits and CJK all break
+    at character boundaries without changing what the reader sees; these do not.
+    """
+    return any(0x0600 <= ord(ch) <= 0x08FF or 0xFB50 <= ord(ch) <= 0xFEFF for ch in word)
+
+
 def break_long_word(word: str, measure: Measure, max_width: float) -> list[str]:
-    """Split a word too wide for the column into the longest fitting pieces."""
+    """Split a word too wide for the column into the longest fitting pieces.
+
+    A connected script is never broken. Cutting an Arabic word in half does not merely
+    hyphenate it: the letters either side of the cut take their isolated and final forms,
+    so the glyphs drawn stop being the glyphs that spell the word the label claims. The
+    word is returned whole instead, over-wide, and the caller declines to place the block
+    - which is the honest outcome, because a column too narrow for a single word is a
+    broken page shape rather than a paragraph needing cleverer breaking.
+    """
     if max_width <= 0 or measure(word) <= max_width:
+        return [word]
+    if _is_connected_script(word):
         return [word]
 
     pieces: list[str] = []

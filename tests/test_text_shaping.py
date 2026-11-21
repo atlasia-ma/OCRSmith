@@ -6,6 +6,7 @@ distinction is modelled explicitly and asserted here.
 """
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
 import pytest
 
@@ -19,6 +20,8 @@ from ocrsmith.text import (
     detect_script,
     resolve_shaper,
 )
+
+FONT_DIR = Path(__file__).resolve().parents[1] / "assets" / "fonts"
 
 HELLO_AR = "مرحبا"
 # Presentation forms: what a non-Raqm renderer needs in order to draw joined Arabic.
@@ -118,13 +121,31 @@ class TestShapedText:
 
 class TestShaperResolution:
     def test_auto_selects_a_working_shaper(self):
+        from ocrsmith.text.shaping import HarfBuzzShaper
+
         shaper = resolve_shaper("auto")
 
-        assert isinstance(shaper, (TransparentShaper, ReshaperBidiShaper))
+        assert isinstance(shaper, (HarfBuzzShaper, TransparentShaper, ReshaperBidiShaper))
+
+    def test_auto_prefers_harfbuzz_when_it_is_available(self):
+        """Backend choice is by how much of the font pool each one can draw.
+
+        The reshaper path needs Arabic presentation forms, and the modern faces — every
+        handwriting and calligraphic one among them — do not implement that block.
+        """
+        from ocrsmith.text.shaping import HarfBuzzShaper, harfbuzz_available
+
+        if not harfbuzz_available():
+            pytest.skip("uharfbuzz / freetype-py not installed")
+
+        assert isinstance(resolve_shaper("auto"), HarfBuzzShaper)
 
     def test_explicit_backends_can_be_requested(self):
+        from ocrsmith.text.shaping import HarfBuzzShaper
+
         assert isinstance(resolve_shaper("raqm"), TransparentShaper)
         assert isinstance(resolve_shaper("reshaper"), ReshaperBidiShaper)
+        assert isinstance(resolve_shaper("harfbuzz"), HarfBuzzShaper)
 
     def test_unknown_backend_is_rejected(self):
         with pytest.raises(ValueError, match="Unknown shaping backend"):
@@ -171,3 +192,63 @@ class TestShapingCache:
         shaped = ReshaperBidiShaper().shape("بالعالم")
 
         assert len(shaped.visual) == len("بالعالم")
+
+
+class TestDiacriticsSurviveShaping:
+    """The fallback shaper must not delete the marks it was handed.
+
+    arabic-reshaper defaults `delete_harakat` to True, which removes every tashkeel mark
+    before reshaping. Without Raqm — the default on a Windows or conda Pillow — the marks
+    then never reach the rasteriser while the label still carries them, so `keep`,
+    `partial` and `strip` all render identically and the first two assert vowels that are
+    not in the pixels. Nothing raises; the dataset just teaches a model to hallucinate.
+    """
+
+    VOCALISED = "دابا كايدوّز بزّاف"
+    SHADDA = "ّ"
+
+    def test_the_shaped_form_still_carries_the_marks(self):
+        from ocrsmith.text.shaping import resolve_shaper
+
+        visual = resolve_shaper().shape(self.VOCALISED).visual
+
+        assert self.SHADDA in visual
+
+    def test_mark_count_is_preserved(self):
+        from ocrsmith.text.shaping import resolve_shaper
+
+        visual = resolve_shaper().shape(self.VOCALISED).visual
+
+        assert visual.count(self.SHADDA) == self.VOCALISED.count(self.SHADDA)
+
+    def test_a_stripped_string_shapes_without_them(self):
+        """The marks in the output come from the input, not from the shaper."""
+        from ocrsmith.text.normalization import strip_diacritics
+        from ocrsmith.text.shaping import resolve_shaper
+
+        visual = resolve_shaper().shape(strip_diacritics(self.VOCALISED)).visual
+
+        assert self.SHADDA not in visual
+
+    def test_keeping_and_stripping_produce_different_pixels(self):
+        """The end-to-end property: `text.diacritics` has to change the image."""
+        import random
+
+        import numpy as np
+
+        from ocrsmith.core.fonts import load_font
+        from ocrsmith.core.lines import LineRenderer, LineStrip
+        from ocrsmith.text.normalization import strip_diacritics
+
+        font = load_font(FONT_DIR / "NotoNaskhArabic-Regular.ttf", 36)
+        strip = LineStrip(text_height=46, pad_left=14, pad_right=14, pad_top=12, pad_bottom=12)
+        renderer = LineRenderer()
+
+        kept = renderer.render(self.VOCALISED, font, None, strip, rng=random.Random(0)).image
+        bare = renderer.render(
+            strip_diacritics(self.VOCALISED), font, None, strip, rng=random.Random(0)
+        ).image
+
+        assert kept.size == bare.size, "the marks changed the advance widths, not just the ink"
+        ink = lambda image: int((np.asarray(image.convert("L")) < 128).sum())  # noqa: E731
+        assert ink(kept) > ink(bare), "the vocalised render drew no extra ink"

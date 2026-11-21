@@ -4,6 +4,221 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-11-21
+
+### Added
+
+- **A HarfBuzz text engine, and with it Arabic handwriting at all.** `ocrsmith[shaping]`
+  brings `uharfbuzz` and `freetype-py`; OCRSmith then applies the font's own `GSUB`/`GPOS`
+  and rasterises the resulting glyph indices itself, the way a browser does.
+
+  This was not an optimisation, it was the removal of a hard blocker. Without Raqm the
+  fallback rewrites Arabic into the presentation-form block (U+FE70-FEFF), which is
+  deprecated and which modern faces do not implement — they join through `GSUB` and carry
+  no FExx glyphs. The coverage gate therefore, correctly, refused them. On the bundled
+  pool that was 32 of 101 faces, and **every handwriting and calligraphic face without
+  exception**: Aref Ruqaa, the standard ruqʿah hand, has 110 Arabic glyphs and zero
+  presentation forms. Arabic handwriting synthesis was not poor, it was impossible, and
+  the only symptom was a `handwriting_families` list that came back empty.
+
+  With the engine: 92 of 101 faces usable instead of 69, 115 of 126 once the hands are
+  fetched, correct `GPOS` mark placement (a shadda anchored to its letter rather than
+  stacked on the advance width), and real ligatures. It costs about 30% of line-mode
+  throughput, 88 to 62 strips per second. Shaping is per word, which is the existing
+  contract and what keeps word boxes exact — letters never join across a space.
+
+  Raqm remains supported and is tried second. It is also harder to obtain than its
+  documentation suggests: neither the conda Pillow nor the current PyPI Windows wheel has
+  it working, because the bundled libraqm looks for a `fribidi.dll` that is not shipped.
+  The `shaping` extra needs no system libraries.
+
+- **`fetch-fonts --hands` and `--category`.** `--hands` fetches the families whose
+  letterforms come from a written hand. Deliberately wider than `--category handwriting`,
+  because Google Fonts puts exactly one Arabic family in that category while the styles
+  people actually write in — ruqʿah above all — are filed under Serif and Display. It
+  returns 11 families where the category returns 1.
+
+- **A line renderer, for recognition data.** `render.mode: line` draws single recognition
+  strips directly instead of laying out a page and cutting it up: 11 ms per sample against
+  664 ms for a page, because a strip is about a thousandth of the pixels of an A4 page at
+  200 dpi. It is not a separate, simpler generator — it shares the font pool, the
+  backgrounds, the text renderer and the degradation presets, so a strip carries the same
+  per-word annotation and exports in the same formats. `build_factory(config)` picks the
+  renderer and is the only place that knows which is running.
+
+  Two things a strip generator usually lacks. The first is **neighbour bleed**: a sliver of
+  the line above or below, clipped into the margins and deliberately absent from the label,
+  because a real crop out of a real detector contains ink belonging to another line, and a
+  corpus of perfectly isolated strips teaches a model that the first and last rows of
+  pixels are always background. The second is the **content distribution**. A recogniser is
+  not fed sentences, it is fed whatever a detector cut out: single words from form fields,
+  a reference number with no sentence around it, unrelated words from a table row, a word
+  sliced in half by a box edge. Those are sampled explicitly rather than inherited from the
+  shape of the corpus.
+
+- **Line-scale degradation presets.** A preset encodes a physical scale as well as a
+  capture condition. The page presets are written for a sheet of paper, and running them
+  over a 40-pixel strip does not degrade it, it destroys it: a vignette across a strip is a
+  horizontal gradient, a coffee stain is the whole image, a page curl bends a page that is
+  not there, and a 4-degree skew throws the text off a canvas one line box tall.
+  `build_preset(name, scale="line")` returns the same conditions at crop scale. The names
+  match, so a corpus specification does not have to be rewritten to switch modes.
+
+- **`ocrsmith bench`.** Single-core throughput for either renderer, with nothing written to
+  disk, so the number is what the renderer costs rather than what the storage costs. It
+  warms up first, because the first call on a machine also pays for the font coverage cache
+  and that belongs to the installation rather than to the renderer.
+
+- **A second colour.** Documents were uniformly black on grey. A per-document accent is now
+  sampled from a short list of colours documents are actually printed in — corporate navy,
+  petrol, maroon, forest, ochre, aubergine — and reaches the title, usually the headings,
+  and the table rules, so the sheet stays coherent the way a real house style does. Chosen
+  once per document, never per block, and never on dark stock, where the ink is already
+  light and a navy heading would be unreadable. Pale header and zebra bands come back with
+  it, but only on plain stock: the reason they were removed in the first place was that
+  shaded banding over a photographed surface reads as a paste-up, and that is still true.
+
+- **`generate` reports what the quality gate threw away**, with the check that rejected it.
+  A run that silently discards a quarter of its samples is a configuration to fix, not a
+  cost to absorb, and a bare page count gives no way to know.
+
+### Changed
+
+- **Documents generate about 2.3x faster — 1.52 s to 0.66 s per page on the default config**
+  — from four structural changes rather than micro-optimisation.
+
+  *Glyph coverage is computed once per face and cached on disk.* It was 38% of wall clock.
+  The lazy per-code-point check needed the font's `glyf`, `cmap`, `post` and `hmtx` tables
+  decompiled, and the bounded cache of opened fonts had 64 slots for a pool of 101 faces, so
+  it thrashed and rebuilt megabytes of tables it was about to need again. Every worker
+  process repeated the whole warm-up, so the cost multiplied by the worker count instead of
+  amortising across it. Coverage is now a bulk set per face, keyed by the font's path, size
+  and mtime, under `OCRSMITH_CACHE_DIR`. Pool construction went from 7.9 s to 0.15 s, and
+  `_has_ink` reads the contour count out of the parsed glyph rather than tracing the outline,
+  which is 8x cheaper for an identical answer.
+
+  *Skew and perspective compose into one homography and one resample.* Two full-page
+  resamples were 52% of what was left — more than layout, text rendering and every other
+  degradation together. Both are homographies and homographies compose, so `PlanarCapture`
+  is the same transform rather than an approximation of it, and it is also *sharper*,
+  because the page is interpolated once instead of twice. `Rotation` and `PerspectiveWarp`
+  remain for a caller who wants one effect alone.
+
+  *The smooth shading stages compose into a single field.* Shadow, vignette, glare, stains,
+  creases and uneven light are all `pixel * gain + bias` with slowly-varying coefficients.
+  Six of them in a row is six passes over a multi-megapixel array to apply something that is
+  almost constant over any hundred pixels. `FieldDegradation` builds the field at a quarter
+  resolution, the pipeline composes every consecutive one into a single pair, and it is
+  upsampled and applied once. The fold is exact: `(g1, b1)` then `(g2, b2)` is
+  `x*g1*g2 + b1*g2 + b2`.
+
+  *Stages share one float32 buffer.* Each one used to decode the page into an array, do a
+  few microseconds of work, clip, round back to `uint8` and re-wrap — about 50 ms per round
+  trip, so a thirteen-stage `photo` preset spent two thirds of a second per page converting
+  between two representations of the same pixels. `Surface` holds whichever was last written
+  and converts only at a boundary. Quantisation now happens once, which also means a shadow
+  that drives a pixel below zero and a glare that brings it back no longer lose the
+  difference.
+
+- **The capture chain is ordered the way a camera works.** `Downscale` modelled the sensor
+  but ran near the end of the `photo` preset, after the blur and before only the noise and
+  the compression. It now sits where the sensor is — after the optics, before the noise —
+  which is both the physically correct place and the reason the rest of the preset runs on a
+  fifth to four fifths of the pixels.
+
+- **The quality gate matches the renderer.** `default_validators(scale)` takes "page" or
+  "line". Only one check differs and it was quietly destructive: `NonEmptyText` requires
+  eight characters and two words, which on a page means the render failed and on a strip
+  means a one-word crop — the normal shape of a form field, a table cell or a caption.
+  The page gate rejected 22% of line samples, and not at random: it removed precisely the
+  short, context-free strings the line renderer exists to produce and for which a model has
+  no language prior. Line rejection fell from 27% to 6%, the remainder being `MinContrast`
+  legitimately catching washed-out strips.
+
+- **`doctor` reports how many faces can actually draw the script**, not how many are on
+  disk. Without Raqm the renderer is handed Arabic presentation forms rather than base
+  letters, and a modern face that joins through `GSUB` carries no glyphs for them — so it is
+  installed, readable and unusable. On the bundled pool that is 73 of 101, and the file
+  count said 101.
+
+- **`generate` and `doctor` warn when the corpus is too thin to be worth rendering.**
+  Leaving `text.source.type` at `inline` and generating a hundred thousand pages produces
+  well-laid-out pages, exact labels, a quality gate that passes every one of them, and a
+  vocabulary of forty words. Nothing failed, and the only symptom arrived weeks later as a
+  model that read its training distribution perfectly and nothing else.
+
+### Fixed
+
+- **A space made every font ineligible.** Introduced while indexing coverage on the font
+  pool: `FontPool.supporting` tested the raw probe string against the drawable code points,
+  and no face carries an outline for U+0020. Every string containing a space therefore
+  matched no font, and the run fell back to the single best-covering face without reporting
+  anything — 78% of samples in one 300-sample run were set in Amiri-Bold. Whitespace and the
+  zero-width formatting marks are now exempt through one shared `required_codepoints`, and
+  the test that would have caught it asserts the regression directly rather than the rule.
+
+- **Handwriting detection matched the opposite of handwriting.** `kufi` was in the
+  filename hint list, so `NotoKufiArabic` was the only "handwriting" family the bundled
+  pool contained — Kufi is the angular, geometric, architectural Arabic script, as far
+  from a written hand as the script gets. Every page the generator set as handwritten was
+  therefore set in a monumental display face. `lalezar`, `marhey`, `qahiri` and `shekari`
+  were hinted too and are poster faces; `reem` matched Reem Kufi. Detection is now a
+  curated list of families that are genuinely hand-derived, plus the Google Fonts
+  category where a `fetch-fonts` manifest records one, plus a denylist that no hint can
+  override.
+
+- **Every diacritic was deleted from the pixels while the label kept it.**
+  `arabic-reshaper` defaults `delete_harakat` to `True`, and OCRSmith constructed it with
+  the defaults. On the no-Raqm path — which is the default on a Windows or conda Pillow,
+  and is what `doctor` has always reported — the tashkeel was therefore removed before the
+  string ever reached the rasteriser. The entire `text.diacritics` section was inert:
+  `keep`, `partial` and `strip` rendered identically, and the first two shipped labels
+  asserting vowels that were not drawn. A model trained on it learns to hallucinate
+  tashkeel, and nothing raises at any point.
+
+  This is the invariant the project is built around, so the fix comes with the end-to-end
+  test rather than only the unit one: keeping and stripping must produce measurably
+  different ink. Coverage is unaffected — the combining marks are in every Arabic face's
+  `cmap`, so the usable pool is the same 69 of 101 either way — and because the probe is
+  the shaped string, a face that genuinely lacked them would now be rejected rather than
+  silently dropping them.
+
+- **`text.normalization` was ignored for inline text sources.** `load_corpus_texts`
+  returned `source.sentences` before reaching the normalisation step, so a corpus
+  configured for Arabic-Indic numerals, unified alef or stripped tatweel got none of it as
+  soon as it fell back to inline text — including the fallback a failed remote corpus
+  lands on. Normalisation now runs on every path.
+
+- **Synthetic numbers in line mode ignored the numeral system.** The corpus is converted
+  at load time, but a `numeric` strip's digits are generated in the factory, so a corpus
+  set to `arabic_indic` rendered western digits on precisely the samples whose entire
+  content is digits.
+
+- **A base install was broken, and so was the README's own install line.** Importing
+  the top-level package pulls in the pipeline, which pulls in the writers, which
+  imported every text loader - and two of those imported `pandas` at module scope.
+  `pandas` is in the `data` extra, so `pip install ocrsmith` produced a package whose
+  own `ocrsmith --help` raised `ModuleNotFoundError`. The imports are now inside the
+  functions that use them. Found by building the wheel and installing it into an empty
+  virtualenv, which is the only way this class of bug shows up: it is invisible from a
+  development checkout, where every extra is already present.
+
+- **A first run with no fonts died in a worker traceback.** The repository ships no
+  typefaces, so this is the first thing a new install hits, and the correct message -
+  "No font files found under ['assets/fonts']" - arrived wrapped in a `RuntimeError`
+  from a dead shard. `generate` now checks before planning the run and prints the two
+  `fetch-fonts` commands.
+
+- **`doctor` printed the wrong install command.** Rich reads `[shaping]` as a markup
+  tag, so the advice rendered as `pip install 'ocrsmith'` - which installs the package
+  without the extra it was telling you to add. The bracket is escaped.
+
+- **Neighbour bleed pasted whole lines instead of slivers.** `RenderedText.place` clamps a
+  negative origin to zero, so a neighbour positioned to hang off the top edge landed fully
+  inside the strip: a second, completely legible line of text that the label did not mention.
+  The sliver is now cut from the rendered neighbour before compositing, and is confined
+  strictly inside the margin.
+
 ## [1.3.0] - 2026-08-13
 
 ### Changed

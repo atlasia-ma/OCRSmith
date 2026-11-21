@@ -71,6 +71,36 @@ page:
     image_paths: []
     tint_range: [[238, 234, 226], [255, 255, 255]]
 
+# Which renderer produces a sample.
+#   document - lay out a whole page; one sample per page, with regions, reading order,
+#              tables and per-word boxes. The richer output, and the slower one.
+#   line     - draw single recognition strips directly. About sixty times cheaper per
+#              sample, because a strip is a thousandth of the pixels of a page. Use it
+#              when what you are training is a recogniser.
+render:
+  mode: document
+
+# Only read when render.mode is "line".
+line:
+  # Height of the line box itself, in pixels; the image is this plus the margins. A
+  # recogniser usually wants 32-48, and the range runs wider so the corpus also contains
+  # strips it has to rescale - which is what a real detector will hand it.
+  text_height_range: [24, 64]
+  words_range: [1, 9]
+  # Sampled per edge, so strips are not all symmetric. A real crop never is.
+  pad_x_range: [6, 40]
+  pad_y_range: [5, 18]
+  # Chance a strip clips a sliver of the line above or below, as a real crop does. Drawn
+  # into the margins and deliberately absent from the label.
+  neighbour_probability: 0.35
+  # Documents are not all printed in pure black, and a model trained as if they were
+  # binarises badly on blue ballpoint and faded toner.
+  inks:
+    black: 6.0
+    near_black: 4.0
+    grey: 1.5
+    blue: 1.5
+
 templates:
   weights:
     article: 3.0
