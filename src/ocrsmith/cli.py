@@ -294,7 +294,10 @@ def doctor(config: Path = _CONFIG_OPTION) -> None:
     else:
         note = (
             "substituting Arabic presentation forms; faces that join through GSUB - "
-            "every handwriting face - cannot be used. pip install 'ocrsmith[shaping]'"
+            # `\[` escapes the bracket for rich, which would otherwise read
+            # `[shaping]` as a markup tag and print `pip install 'ocrsmith'` - a
+            # command that installs the wrong thing.
+            r"every handwriting face - cannot be used. pip install 'ocrsmith\[shaping]'"
         )
         colour = "yellow"
     table.add_row("text engine", f"[{colour}]{engine}[/]", note)
@@ -325,7 +328,7 @@ def doctor(config: Path = _CONFIG_OPTION) -> None:
         advice = (
             ""
             if harfbuzz_available() or raqm_available()
-            else "  -> pip install 'ocrsmith[shaping]' to use the rest"
+            else r"  -> pip install 'ocrsmith\[shaping]' to use the rest"
         )
         console.print(
             f"usable faces: [{colour}]{usable}[/] of {len(faces)} can draw Arabic and Latin{advice}"

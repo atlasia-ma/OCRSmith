@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-11-21
 
 ### Added
 
@@ -193,6 +193,25 @@ All notable changes to this project are documented here. The format follows
   at load time, but a `numeric` strip's digits are generated in the factory, so a corpus
   set to `arabic_indic` rendered western digits on precisely the samples whose entire
   content is digits.
+
+- **A base install was broken, and so was the README's own install line.** Importing
+  the top-level package pulls in the pipeline, which pulls in the writers, which
+  imported every text loader - and two of those imported `pandas` at module scope.
+  `pandas` is in the `data` extra, so `pip install ocrsmith` produced a package whose
+  own `ocrsmith --help` raised `ModuleNotFoundError`. The imports are now inside the
+  functions that use them. Found by building the wheel and installing it into an empty
+  virtualenv, which is the only way this class of bug shows up: it is invisible from a
+  development checkout, where every extra is already present.
+
+- **A first run with no fonts died in a worker traceback.** The repository ships no
+  typefaces, so this is the first thing a new install hits, and the correct message -
+  "No font files found under ['assets/fonts']" - arrived wrapped in a `RuntimeError`
+  from a dead shard. `generate` now checks before planning the run and prints the two
+  `fetch-fonts` commands.
+
+- **`doctor` printed the wrong install command.** Rich reads `[shaping]` as a markup
+  tag, so the advice rendered as `pip install 'ocrsmith'` - which installs the package
+  without the extra it was telling you to add. The bracket is escaped.
 
 - **Neighbour bleed pasted whole lines instead of slivers.** `RenderedText.place` clamps a
   negative origin to zero, so a neighbour positioned to hang off the top edge landed fully
