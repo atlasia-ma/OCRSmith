@@ -28,9 +28,7 @@ def _is_connected_script(word: str) -> bool:
     Arabic, Syriac, Nko and the Arabic-derived blocks. Latin, digits and CJK all break
     at character boundaries without changing what the reader sees; these do not.
     """
-    return any(
-        0x0600 <= ord(ch) <= 0x08FF or 0xFB50 <= ord(ch) <= 0xFEFF for ch in word
-    )
+    return any(0x0600 <= ord(ch) <= 0x08FF or 0xFB50 <= ord(ch) <= 0xFEFF for ch in word)
 
 
 def break_long_word(word: str, measure: Measure, max_width: float) -> list[str]:

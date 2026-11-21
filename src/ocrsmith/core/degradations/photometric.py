@@ -138,9 +138,7 @@ class PaperGrain(ArrayDegradation):
         strength = _sample(rng, self.strength)
         height, width = array.shape[:2]
         generator = np.random.default_rng(rng.getrandbits(32))
-        small = generator.standard_normal(
-            (max(1, height // 4), max(1, width // 4)), dtype=np.float32
-        )
+        small = generator.standard_normal((max(1, height // 4), max(1, width // 4)), dtype=np.float32)
         small *= np.float32(strength)
         # Upsampled through PIL rather than through a numpy interpolation: the quarter-
         # scale plane is 16x smaller, so the resample dominates and PIL's is in C.

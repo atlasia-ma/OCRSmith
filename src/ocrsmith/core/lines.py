@@ -159,9 +159,7 @@ class LineRenderer:
     # -- internals ---------------------------------------------------------
 
     @staticmethod
-    def _canvas(
-        background: Image.Image | None, width: int, height: int, rng: random.Random
-    ) -> Image.Image:
+    def _canvas(background: Image.Image | None, width: int, height: int, rng: random.Random) -> Image.Image:
         """A strip-sized patch of `background`, taken from a random offset within it.
 
         A random offset rather than the top-left corner, so a thousand strips cut from one

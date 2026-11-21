@@ -147,9 +147,7 @@ class TestHarfBuzzEngineUnlocksTheModernPool:
         if not harfbuzz_available():
             pytest.skip("uharfbuzz / freetype-py not installed")
 
-        rendered = TextBlockRenderer().render(
-            self.ARABIC, load_font(face, 40), rng=random.Random(0)
-        )
+        rendered = TextBlockRenderer().render(self.ARABIC, load_font(face, 40), rng=random.Random(0))
         alpha = np.asarray(rendered.image.split()[-1])
 
         assert rendered.lines, "nothing was laid out"

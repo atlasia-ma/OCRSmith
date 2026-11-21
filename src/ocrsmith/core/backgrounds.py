@@ -229,8 +229,7 @@ def _hue_profile(image: Image.Image) -> tuple[float, float, float, float]:
     red_green = array[..., 0] - array[..., 1]
     yellow_blue = 0.5 * (array[..., 0] + array[..., 1]) - array[..., 2]
     colourfulness = float(
-        np.hypot(red_green.std(), yellow_blue.std())
-        + 0.3 * np.hypot(red_green.mean(), yellow_blue.mean())
+        np.hypot(red_green.std(), yellow_blue.std()) + 0.3 * np.hypot(red_green.mean(), yellow_blue.mean())
     )
     return mean_hue, float(saturation.mean()), 1.0 - resultant, colourfulness
 
@@ -325,7 +324,6 @@ def adapt_to_background(
             luma = rng.uniform(max(_DARK_INK_LUMA[0], ceiling - _INK_LATITUDE), ceiling)
             if not colourful or luma >= _HUE_VISIBLE[0]:
                 return factory, _ink_at(complement, luma, ink_saturation)
-
 
     # Either no ink clears the surface, or it has too many hues for one complement to
     # oppose, or it is bright enough that ink against it could never show its colour. All

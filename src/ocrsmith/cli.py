@@ -152,15 +152,11 @@ def preview(
                     draw.rectangle(region.bbox.as_int(), outline=(220, 60, 60), width=3 * scale)
                     if region.table is not None:
                         for cell in region.table.cells:
-                            draw.rectangle(
-                                cell.bbox.as_int(), outline=(240, 150, 30), width=2 * scale
-                            )
+                            draw.rectangle(cell.bbox.as_int(), outline=(240, 150, 30), width=2 * scale)
                     for line in region.lines:
                         draw.rectangle(line.bbox.as_int(), outline=(40, 110, 220), width=1 * scale)
                         for word in line.words:
-                            draw.rectangle(
-                                word.bbox.as_int(), outline=(30, 170, 90), width=1 * scale
-                            )
+                            draw.rectangle(word.bbox.as_int(), outline=(30, 170, 90), width=1 * scale)
             image.save(output_dir / f"{sample.id}.png")
             (output_dir / f"{sample.id}.md").write_text(sample.page.to_markdown(), encoding="utf-8")
             written += 1
@@ -536,9 +532,7 @@ def bench(
     config: Path = _CONFIG_OPTION,
     set_: list[str] = _SET_OPTION,
     count: int = typer.Option(0, "--count", "-n", help="Samples per mode (0 = pick a sensible default)."),
-    mode: str = typer.Option(
-        "both", "--mode", "-m", help="Which renderer to time: document, line, or both."
-    ),
+    mode: str = typer.Option("both", "--mode", "-m", help="Which renderer to time: document, line, or both."),
 ) -> None:
     """Measure single-core generation throughput.
 

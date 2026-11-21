@@ -89,9 +89,7 @@ class SampleFactory:
             self.text = text_provider or CorpusTextProvider(config.text.source.sentences)
             self.documents = build_documents(config)
             if not self.documents:
-                raise ValueError(
-                    "text.mode is 'documents' but the source yielded nothing to lay out"
-                )
+                raise ValueError("text.mode is 'documents' but the source yielded nothing to lay out")
         else:
             self.text = text_provider or build_text_provider(config)
         self.backgrounds = BackgroundSampler(
@@ -305,10 +303,7 @@ class SampleFactory:
             # Every column must earn its place. Text that fills one column of a two-column
             # sheet leaves the other blank, and half an empty page beside a block of type
             # is the single most obviously synthetic thing a generator produces.
-            while (
-                candidate.columns > 1
-                and chars / self._estimated_capacity(candidate, body_size) < 0.55
-            ):
+            while candidate.columns > 1 and chars / self._estimated_capacity(candidate, body_size) < 0.55:
                 candidate = replace(candidate, columns=candidate.columns - 1)
             fill = chars / self._estimated_capacity(candidate, body_size)
             error = abs(fill - target)
@@ -449,9 +444,7 @@ class SampleFactory:
                 return columns
         return 1
 
-    def _typography(
-        self, content, rng: random.Random, dpi: int, ink=None, heavy: bool = False, profile=None
-    ):
+    def _typography(self, content, rng: random.Random, dpi: int, ink=None, heavy: bool = False, profile=None):
         # Probe against everything the page will draw - table cells and list items
         # included - and against the *shaped* form, which is what actually reaches the
         # rasteriser.
@@ -678,7 +671,6 @@ def build_text_provider(config: GenerationConfig) -> CorpusTextProvider:
 def build_documents(config: GenerationConfig) -> list[str]:
     """The corpus kept as whole documents, for the lay-out-what-I-gave-you path."""
     return load_corpus_texts(config)
-
 
 
 def build_factory(config: GenerationConfig):

@@ -167,9 +167,7 @@ class CaptureConfig(BaseModel):
 
     partial_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     #: Which part of the sheet the capture caught.
-    modes: dict[str, float] = Field(
-        default_factory=lambda: {"top": 2.0, "bottom": 1.5, "middle": 1.0}
-    )
+    modes: dict[str, float] = Field(default_factory=lambda: {"top": 2.0, "bottom": 1.5, "middle": 1.0})
     #: Fraction of the page height kept.
     keep_range: tuple[float, float] = (0.4, 0.85)
 

@@ -348,9 +348,7 @@ class TestPlanarCapture:
         image, page = _page_with_mark()
         rng = random.Random(5)
 
-        warped, new_page, params = PlanarCapture(max_angle=6.0, magnitude=0.05).apply(
-            image, page, rng
-        )
+        warped, new_page, params = PlanarCapture(max_angle=6.0, magnitude=0.05).apply(image, page, rng)
 
         assert params["angle"] != 0.0
         assert new_page.width == warped.width and new_page.height == warped.height
@@ -411,9 +409,7 @@ class TestPlanarCapture:
 
         image, page = _page_with_mark(stripes=True)
 
-        fused, _, _ = PlanarCapture(max_angle=4.0, magnitude=0.03).apply(
-            image, page, random.Random(2)
-        )
+        fused, _, _ = PlanarCapture(max_angle=4.0, magnitude=0.03).apply(image, page, random.Random(2))
         staged, staged_page, _ = PerspectiveWarp(magnitude=0.03).apply(image, page, random.Random(2))
         staged, _, _ = Rotation(max_angle=4.0).apply(staged, staged_page, random.Random(2))
 

@@ -112,9 +112,7 @@ class TestLineRenderer:
         assert rendered.text == "مرحبا بالعالم"
 
     def test_empty_text_yields_an_empty_annotation_rather_than_raising(self):
-        rendered = LineRenderer().render(
-            "   ", load_font(ARABIC_FONT, 30), None, STRIP, rng=random.Random(0)
-        )
+        rendered = LineRenderer().render("   ", load_font(ARABIC_FONT, 30), None, STRIP, rng=random.Random(0))
 
         assert rendered.text == ""
         assert rendered.line.words == ()
@@ -176,8 +174,7 @@ class TestLineSampleFactory:
         """
         factory = LineSampleFactory(config())
         faces = collections.Counter(
-            Path(list(factory.create(index))[0].provenance.font_path).name
-            for index in range(120)
+            Path(list(factory.create(index))[0].provenance.font_path).name for index in range(120)
         )
 
         assert len(faces) > 20, f"only {len(faces)} distinct faces used"
@@ -218,9 +215,7 @@ class TestNumeralPolicy:
         import random
 
         arabic_indic = set("٠١٢٣٤٥٦٧٨٩")
-        factory = LineSampleFactory(
-            config(text={"normalization": {"numerals": "arabic_indic"}})
-        )
+        factory = LineSampleFactory(config(text={"normalization": {"numerals": "arabic_indic"}}))
         rng = random.Random(3)
 
         digits = set()
@@ -261,8 +256,6 @@ class TestInlineSourceIsNormalisedToo:
     def test_keep_still_round_trips_inline_text_unchanged(self):
         from ocrsmith.pipeline.factory import load_corpus_texts
 
-        spec = GenerationConfig(
-            text={"source": {"type": "inline", "sentences": ["في سنة 2024 صدر التقرير"]}}
-        )
+        spec = GenerationConfig(text={"source": {"type": "inline", "sentences": ["في سنة 2024 صدر التقرير"]}})
 
         assert load_corpus_texts(spec) == ["في سنة 2024 صدر التقرير"]

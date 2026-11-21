@@ -316,18 +316,14 @@ class TestFlowLayout:
         )
         spec = PageSpec.from_paper("a5", dpi=100, direction=Direction.RTL)
 
-        page = renderer.render(
-            content, spec, typography, table_style=TableStyle(stretch=False), rng=rng
-        )[0]
+        page = renderer.render(content, spec, typography, table_style=TableStyle(stretch=False), rng=rng)[0]
 
         table = page.page.regions_of(RegionType.TABLE)[0]
         paragraph = page.page.regions_of(RegionType.PARAGRAPH)[0]
         assert table.bbox.x1 == pytest.approx(paragraph.bbox.x1, abs=2)
         assert table.bbox.x0 > paragraph.bbox.x0
 
-    def test_a_stretched_table_spans_the_text_measure(
-        self, renderer, typography, rng, arabic_source
-    ):
+    def test_a_stretched_table_spans_the_text_measure(self, renderer, typography, rng, arabic_source):
         """The default: a table is as wide as the paragraphs around it.
 
         Sized to its content instead, an invoice's item table came out two thirds the width

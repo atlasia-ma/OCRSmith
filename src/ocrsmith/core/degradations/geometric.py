@@ -192,8 +192,7 @@ class PlanarCapture(Degradation):
         cos, sin = math.cos(radians), math.sin(radians)
         cx, cy = width / 2.0, height / 2.0
         target = [
-            (cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos)
-            for x, y in source
+            (cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos) for x, y in source
         ]
 
         # Then push each corner out independently: that is what makes a photograph of a

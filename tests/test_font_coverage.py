@@ -110,11 +110,7 @@ class TestHollowGlyphs:
     """
 
     ESTEDAD = (
-        Path(__file__).resolve().parents[1]
-        / "assets"
-        / "fonts_google"
-        / "estedad"
-        / "Estedad[wght].ttf"
+        Path(__file__).resolve().parents[1] / "assets" / "fonts_google" / "estedad" / "Estedad[wght].ttf"
     )
     # Presentation forms the reshaper emits for "كنتي": initial kaf, medial noon,
     # medial teh, final yeh. All four are in Estedad's cmap and all four are hollow.

@@ -147,9 +147,7 @@ class FontPool:
         # objects per sample just to reach a memo. That was a fifth of the line pipeline.
         warm_coverage_cache(self.faces)
         self._drawable: tuple[tuple[Path, frozenset[int]], ...] = tuple(
-            (face, coverage)
-            for face in self.faces
-            if (coverage := _coverage_or_none(face)) is not None
+            (face, coverage) for face in self.faces if (coverage := _coverage_or_none(face)) is not None
         )
 
     def __len__(self) -> int:

@@ -532,9 +532,7 @@ class NewspaperTemplate:
         # broadsheet from running two columns of copy and leaving the rest of the sheet
         # blank - which reads as full on any measure of vertical fill and is still half an
         # empty page.
-        for index in range(
-            scale_count(options, rng, base=(4, 8), per_1000_chars=0.9, cap=30)
-        ):
+        for index in range(scale_count(options, rng, base=(4, 8), per_1000_chars=0.9, cap=30)):
             if index:
                 builder.heading(source.title(rng), level=3)
             for _ in range(rng.randint(2, 4)):

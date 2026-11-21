@@ -141,9 +141,7 @@ def _compute_drawable(font_path: str) -> frozenset[int]:
                 charstrings = None
         glyph_set = font.getGlyphSet() if (glyf is None and charstrings is None) else None
         return frozenset(
-            codepoint
-            for codepoint, name in cmap.items()
-            if _has_ink(name, glyf, charstrings, glyph_set)
+            codepoint for codepoint, name in cmap.items() if _has_ink(name, glyf, charstrings, glyph_set)
         )
     finally:
         with contextlib.suppress(Exception):
@@ -191,9 +189,7 @@ def _ranges(codepoints: frozenset[int]) -> list[list[int]]:
 
 
 def _unranges(ranges: Iterable[Sequence[int]]) -> frozenset[int]:
-    return frozenset(
-        codepoint for low, high in ranges for codepoint in range(int(low), int(high) + 1)
-    )
+    return frozenset(codepoint for low, high in ranges for codepoint in range(int(low), int(high) + 1))
 
 
 def _read_cached(directory: Path, key: str) -> frozenset[int] | None:

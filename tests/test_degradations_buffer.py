@@ -29,9 +29,7 @@ def page_for(image: Image.Image) -> Page:
 
 def noise_image(width: int = 160, height: int = 96, seed: int = 0) -> Image.Image:
     generator = np.random.default_rng(seed)
-    return Image.fromarray(
-        generator.integers(40, 215, (height, width, 3), dtype=np.uint8), "RGB"
-    )
+    return Image.fromarray(generator.integers(40, 215, (height, width, 3), dtype=np.uint8), "RGB")
 
 
 class TestSurface:
@@ -136,9 +134,7 @@ class TestFieldFusion:
         image = Image.new("RGB", (64, 32), (100, 100, 100))
 
         alone, _ = _Scale(0.5).transform(image, random.Random(0))
-        through, _page, _ = DegradationPipeline([_Scale(0.5)]).apply(
-            image, page_for(image), random.Random(0)
-        )
+        through, _page, _ = DegradationPipeline([_Scale(0.5)]).apply(image, page_for(image), random.Random(0))
 
         assert np.array_equal(np.asarray(alone), np.asarray(through))
 
@@ -165,9 +161,7 @@ class TestRealFieldsStayFaithful:
         stage = getattr(photometric, name)(probability=1.0)
         image = noise_image(240, 160)
 
-        result, _page, _ = DegradationPipeline([stage]).apply(
-            image, page_for(image), random.Random(7)
-        )
+        result, _page, _ = DegradationPipeline([stage]).apply(image, page_for(image), random.Random(7))
         before = np.asarray(image, dtype=np.float32)
         after = np.asarray(result, dtype=np.float32)
 

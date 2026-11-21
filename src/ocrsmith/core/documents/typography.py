@@ -377,9 +377,7 @@ class TypographySampler:
         # them. Setting text over an image heavier is what a designer does for the same
         # reason, and it is the difference between a caption that survives a capture
         # condition and one that dissolves into it.
-        body = role(
-            family.bold if heavy else family.regular, body_size, before=0, after=body_size * 0.6
-        )
+        body = role(family.bold if heavy else family.regular, body_size, before=0, after=body_size * 0.6)
         # The accent reaches the title always and the headings usually. A document whose
         # title is coloured and whose headings are black is a real layout; one where every
         # level is coloured is also real; one where a random subset of headings is

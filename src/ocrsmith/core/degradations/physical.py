@@ -40,9 +40,7 @@ def _smooth_noise(shape: tuple[int, int], scale: int, generator: np.random.Gener
     generating them per-pixel would be both wrong and slow.
     """
     height, width = shape
-    small = generator.standard_normal(
-        (max(2, height // scale), max(2, width // scale)), dtype=np.float32
-    )
+    small = generator.standard_normal((max(2, height // scale), max(2, width // scale)), dtype=np.float32)
     small = np.clip(small, -3.0, 3.0) / 3.0
     image = Image.fromarray(((small + 1.0) * 127.5).astype(np.uint8))
     resized = np.asarray(image.resize((width, height), Image.Resampling.BICUBIC), dtype=np.float32)
