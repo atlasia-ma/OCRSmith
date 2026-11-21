@@ -51,13 +51,20 @@ data = [
     "datasets>=2.19",
     "huggingface-hub>=0.23",
 ]
+# Shape with HarfBuzz and rasterise with FreeType instead of substituting Arabic
+# presentation forms. Without this, every font that joins through GSUB - which is every
+# modern face, and every handwriting and calligraphic one - is unusable.
+shaping = [
+    "uharfbuzz>=0.39",
+    "freetype-py>=2.4",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.5",
 ]
 all = [
-    "ocrsmith[data,dev]",
+    "ocrsmith[data,dev,shaping]",
 ]
 
 [project.urls]

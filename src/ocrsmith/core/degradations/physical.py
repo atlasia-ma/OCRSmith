@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 from ...domain.annotations import Page
-from .base import Degradation, PhotometricDegradation, map_page
+from .base import Degradation, FieldDegradation, map_page
 from .photometric import _as_rgb, _axes, _sample
 
 __all__ = ["IlluminationField", "PageCurl", "Wrinkles"]
@@ -40,7 +40,9 @@ def _smooth_noise(shape: tuple[int, int], scale: int, generator: np.random.Gener
     generating them per-pixel would be both wrong and slow.
     """
     height, width = shape
-    small = generator.normal(0.0, 1.0, (max(2, height // scale), max(2, width // scale))).astype(np.float32)
+    small = generator.standard_normal(
+        (max(2, height // scale), max(2, width // scale)), dtype=np.float32
+    )
     small = np.clip(small, -3.0, 3.0) / 3.0
     image = Image.fromarray(((small + 1.0) * 127.5).astype(np.uint8))
     resized = np.asarray(image.resize((width, height), Image.Resampling.BICUBIC), dtype=np.float32)
@@ -196,7 +198,7 @@ class PageCurl(_DisplacementDegradation):
         return warped, mapped_page, params
 
 
-class IlluminationField(PhotometricDegradation):
+class IlluminationField(FieldDegradation):
     """Uneven lighting: a smooth multiplicative field across the page.
 
     Distinct from `Shadow`, which is a linear ramp, and from `Vignette`, which is radial
@@ -214,16 +216,8 @@ class IlluminationField(PhotometricDegradation):
         self.scale = scale
         self.probability = probability
 
-    def transform(self, image, rng) -> tuple[Image.Image, dict[str, Any]]:
+    def field(self, width, height, rng):
         strength = _sample(rng, self.strength)
-        image = _as_rgb(image)
-        width, height = image.size
         generator = np.random.default_rng(rng.getrandbits(32))
-
-        field = _smooth_noise((height, width), max(2, min(width, height) // self.scale), generator)
-        multiplier = 1.0 + strength * field
-        array = np.asarray(image, dtype=np.float32) * multiplier[..., None]
-        return (
-            Image.fromarray(np.clip(array, 0, 255).astype(np.uint8), "RGB"),
-            {"strength": strength, "scale": self.scale},
-        )
+        noise = _smooth_noise((height, width), max(2, min(width, height) // self.scale), generator)
+        return 1.0 + np.float32(strength) * noise, None, {"strength": strength, "scale": self.scale}

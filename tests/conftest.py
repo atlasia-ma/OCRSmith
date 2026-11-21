@@ -13,6 +13,28 @@ from PIL import Image
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts")
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _isolated_font_cache():
+    """Run the suite against a throwaway font-coverage cache.
+
+    Coverage answers are cached on disk between runs, keyed by the font's bytes. That is
+    what keeps a hundred-face pool cheap in production and it is exactly what a test must
+    not depend on: a cached answer would let a coverage test pass against a bug in the
+    code that produces the answer. Each session gets its own directory, so every run
+    computes coverage for real and nothing is left behind in the working tree.
+    """
+    with tempfile.TemporaryDirectory(prefix="ocrsmith-fontcache-") as cache:
+        previous = os.environ.get("OCRSMITH_CACHE_DIR")
+        os.environ["OCRSMITH_CACHE_DIR"] = cache
+        try:
+            yield cache
+        finally:
+            if previous is None:
+                os.environ.pop("OCRSMITH_CACHE_DIR", None)
+            else:
+                os.environ["OCRSMITH_CACHE_DIR"] = previous
+
+
 @pytest.fixture
 def temp_dir():
     with tempfile.TemporaryDirectory() as tmpdir:

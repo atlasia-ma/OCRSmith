@@ -20,6 +20,7 @@ from ocrsmith.core.documents import (
     DocumentRenderer,
     InvoiceTemplate,
     PageSpec,
+    TableStyle,
     TypographySampler,
     default_registry,
     group_font_families,
@@ -315,12 +316,40 @@ class TestFlowLayout:
         )
         spec = PageSpec.from_paper("a5", dpi=100, direction=Direction.RTL)
 
-        page = renderer.render(content, spec, typography, rng=rng)[0]
+        page = renderer.render(
+            content, spec, typography, table_style=TableStyle(stretch=False), rng=rng
+        )[0]
 
         table = page.page.regions_of(RegionType.TABLE)[0]
         paragraph = page.page.regions_of(RegionType.PARAGRAPH)[0]
         assert table.bbox.x1 == pytest.approx(paragraph.bbox.x1, abs=2)
         assert table.bbox.x0 > paragraph.bbox.x0
+
+    def test_a_stretched_table_spans_the_text_measure(
+        self, renderer, typography, rng, arabic_source
+    ):
+        """The default: a table is as wide as the paragraphs around it.
+
+        Sized to its content instead, an invoice's item table came out two thirds the width
+        of the closing paragraph and pushed against the right margin, which reads as a
+        pasted-in box rather than as the table the document is built around.
+        """
+        content = (
+            DocumentBuilder(direction=Direction.RTL)
+            .paragraph(arabic_source.sentence(rng))
+            .table([["أ", "ب"], ["1", "2"]])
+            .build()
+        )
+        spec = PageSpec.from_paper("a5", dpi=100, direction=Direction.RTL)
+
+        page = renderer.render(content, spec, typography, rng=rng)[0]
+
+        # Compared against the column, not against the paragraph: a paragraph's box stops
+        # at its shortest line, so its ragged edge is not where the measure ends.
+        table = page.page.regions_of(RegionType.TABLE)[0]
+        column = spec.column_boxes()[0]
+        assert table.bbox.x0 == pytest.approx(column.x0, abs=3)
+        assert table.bbox.x1 == pytest.approx(column.x1, abs=3)
 
     def test_figures_are_annotated_even_though_they_are_placeholders(self, renderer, typography, rng):
         content = DocumentBuilder().figure(200, 120, caption="cap").build()

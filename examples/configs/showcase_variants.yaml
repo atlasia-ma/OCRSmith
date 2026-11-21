@@ -1,0 +1,71 @@
+# The showcase: every axis of variation the generator has, exercised at once.
+#
+# Real Arabic documents supplied as Markdown, laid out across eight surfaces, drawn on
+# paper / solid / gradient / photographic backgrounds, captured whole or in part, under
+# five capture conditions. The words always mean something; everything around them moves.
+
+seed: 20260827
+
+fonts:
+  paths: ["assets/fonts_google"]
+  size_range: [17, 30]
+  require_full_coverage: true
+
+text:
+  mode: documents
+  format: markdown
+  source:
+    type: csv
+    path: assets/text_data/arabic_markdown.csv
+    column: text
+  direction: rtl
+  chunk:
+    max_chars: [400, 2200]
+    max_blocks: [3, 12]
+  diacritics:
+    mode: mixed
+
+page:
+  papers:
+    a4: 5.0
+    a5: 2.5
+    letter: 2.0
+    a3: 1.0
+    legal: 1.0
+    a6: 0.8
+    receipt: 1.2
+    id_card: 0.6
+  dpi_range: [120, 200]
+  margin_mm_range: [8.0, 26.0]
+  columns: { 1: 4.0, 2: 2.0 }
+  landscape_probability: 0.18
+  header_probability: 0.4
+  footer_probability: 0.45
+  max_pages: 1
+  background:
+    # Photographic backgrounds: a document on a desk, a wall, a table - the surface the
+    # page is resting on is part of what a phone camera actually sees.
+    kinds: { paper: 3.0, solid: 1.0, gradient: 1.0, image: 2.5 }
+    image_paths: ["assets/backgrounds"]
+  capture:
+    partial_probability: 0.3
+    modes: { top: 2.0, bottom: 1.5, middle: 1.0 }
+    keep_range: [0.45, 0.85]
+
+degradations:
+  presets:
+    clean: 1.5
+    scan: 2.5
+    photo: 3.0
+    fax: 1.0
+    archive: 1.5
+
+output:
+  dir: outputs/showcase_variants
+  format: jsonl
+  image_format: png
+  shard_size: 14
+
+run:
+  num_samples: 84
+  workers: 6

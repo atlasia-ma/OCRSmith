@@ -15,7 +15,13 @@ from rich.table import Table
 
 from .config import DEFAULT_CONFIG_PATH, load_config
 from .datasets.writers import sink_names
-from .pipeline import SampleFactory, parallelism_advice, plan_shards, run_generation
+from .pipeline import (
+    SampleFactory,
+    corpus_advice,
+    parallelism_advice,
+    plan_shards,
+    run_generation,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -59,9 +65,9 @@ def generate(
         f"in [cyan]{spec.output.dir}[/] as [cyan]{spec.output.format}[/] "
         f"using [bold]{spec.run.workers}[/] worker(s)"
     )
-    advice = parallelism_advice(spec)
-    if advice:
-        console.print(f"[yellow]{advice}[/]")
+    for advice in (parallelism_advice(spec), corpus_advice(spec)):
+        if advice:
+            console.print(f"[yellow]{advice}[/]")
 
     with Progress(
         TextColumn("[progress.description]{task.description}"),
@@ -79,6 +85,16 @@ def generate(
     )
     if result.skipped_shards:
         console.print(f"[yellow]Skipped {len(result.skipped_shards)} already-complete shard(s).[/]")
+    if result.rejected:
+        # What the quality gate threw away, and why. A run that silently discards a
+        # quarter of its samples is a configuration to fix, not a cost to absorb, and the
+        # only way to know is to be told which check is doing the rejecting.
+        dropped = sum(result.rejected.values())
+        share = dropped / max(1, dropped + result.pages)
+        reasons = ", ".join(
+            f"{name} {count}" for name, count in sorted(result.rejected.items(), key=lambda i: -i[1])
+        )
+        console.print(f"[yellow]Quality gate dropped {dropped} sample(s) ({share:.0%}): {reasons}[/]")
     if result.failures:
         console.print(f"[red]{result.failures} shard(s) failed.[/]")
         for index, reason in result.shard_errors:
@@ -106,11 +122,25 @@ def preview(
         for sample in factory.create(index):
             image = sample.image.convert("RGB")
             if boxes:
+                # Every level the annotation actually carries, not just the outer two.
+                # Words and table cells are the labels that make this corpus usable for
+                # detection and table structure, and an overlay that omits them undersells
+                # what the file contains.
                 draw = ImageDraw.Draw(image)
+                scale = max(1, round(min(image.size) / 900))
                 for region in sample.page.regions:
-                    draw.rectangle(region.bbox.as_int(), outline=(220, 60, 60), width=3)
+                    draw.rectangle(region.bbox.as_int(), outline=(220, 60, 60), width=3 * scale)
+                    if region.table is not None:
+                        for cell in region.table.cells:
+                            draw.rectangle(
+                                cell.bbox.as_int(), outline=(240, 150, 30), width=2 * scale
+                            )
                     for line in region.lines:
-                        draw.rectangle(line.bbox.as_int(), outline=(40, 110, 220), width=1)
+                        draw.rectangle(line.bbox.as_int(), outline=(40, 110, 220), width=1 * scale)
+                        for word in line.words:
+                            draw.rectangle(
+                                word.bbox.as_int(), outline=(30, 170, 90), width=1 * scale
+                            )
             image.save(output_dir / f"{sample.id}.png")
             (output_dir / f"{sample.id}.md").write_text(sample.page.to_markdown(), encoding="utf-8")
             written += 1
@@ -122,6 +152,16 @@ def fetch_fonts(
     subset: str = typer.Option("arabic", "--subset", "-s", help="Unicode subset, e.g. arabic, latin."),
     output_dir: Path = typer.Option(Path("assets/fonts"), "--output", "-o"),
     limit: int = typer.Option(0, "--limit", "-n", help="Fetch at most this many families (0 = all)."),
+    category: str = typer.Option(
+        None,
+        "--category",
+        help="Only families in this Google Fonts category: handwriting, serif, sans-serif, display.",
+    ),
+    hands: bool = typer.Option(
+        False,
+        "--hands",
+        help="Only families whose letterforms come from a written hand (wider than --category handwriting).",
+    ),
     include_noto: bool = typer.Option(True, "--include-noto/--no-noto"),
     dry_run: bool = typer.Option(False, "--dry-run", help="List what would be fetched."),
 ) -> None:
@@ -134,10 +174,26 @@ def fetch_fonts(
     from .assets import fetch_families, list_families, write_manifest
 
     records = list_families(subset)
+    if category:
+        wanted = category.strip().lower().replace("-", " ")
+        records = tuple(r for r in records if r.category.strip().lower().replace("-", " ") == wanted)
+    if hands:
+        # Wider than `--category handwriting` on purpose. Google Fonts puts exactly one
+        # Arabic family in that category, while the styles people actually write in -
+        # ruqʿah above all - are filed under Serif and Display. Fetching by category
+        # alone gives a "handwriting" pool of one face.
+        from .core.documents.typography import _looks_handwritten
+
+        records = tuple(
+            r for r in records if _looks_handwritten(r.family) or r.category.lower() == "handwriting"
+        )
     if not include_noto:
         records = tuple(record for record in records if not record.is_noto)
     if limit:
         records = records[:limit]
+    if not records:
+        console.print("[yellow]No families matched. Try --dry-run without the filters.[/]")
+        raise typer.Exit(code=1)
 
     console.print(f"[bold]{len(records)}[/] open-licensed families with the [cyan]{subset}[/] subset")
     if dry_run:
@@ -197,7 +253,8 @@ def fonts(
 def doctor(config: Path = _CONFIG_OPTION) -> None:
     """Report whether this machine can produce correct Arabic output."""
     from .core.fonts import discover_fonts
-    from .text import raqm_available, resolve_shaper
+    from .text import resolve_shaper
+    from .text.shaping import harfbuzz_available, raqm_available
 
     spec = load_config(config)
     shaper = resolve_shaper()
@@ -207,25 +264,56 @@ def doctor(config: Path = _CONFIG_OPTION) -> None:
     table.add_column("check")
     table.add_column("result")
     table.add_column("note")
-    table.add_row(
-        "Pillow Raqm",
-        "[green]yes[/]" if raqm_available() else "[yellow]no[/]",
-        "shaping delegated to HarfBuzz"
-        if raqm_available()
-        else "falling back to arabic-reshaper + python-bidi (still correct)",
-    )
-    table.add_row("shaper", type(shaper).__name__, "")
+    engine = type(shaper).__name__
+    if harfbuzz_available():
+        note = "OCRSmith shapes with HarfBuzz and rasterises with FreeType"
+        colour = "green"
+    elif raqm_available():
+        note = "shaping delegated to Pillow's Raqm"
+        colour = "green"
+    else:
+        note = (
+            "substituting Arabic presentation forms; faces that join through GSUB - "
+            "every handwriting face - cannot be used. pip install 'ocrsmith[shaping]'"
+        )
+        colour = "yellow"
+    table.add_row("text engine", f"[{colour}]{engine}[/]", note)
+    table.add_row("Pillow Raqm", "yes" if raqm_available() else "no", "")
     table.add_row(
         "fonts",
         f"[green]{len(faces)}[/]" if faces else "[red]0[/]",
         ", ".join(str(path) for path in spec.fonts.paths),
     )
+    table.add_row("renderer", spec.render.mode, "render.mode")
     table.add_row("text source", spec.text.source.type, str(spec.text.source.path or "inline"))
     table.add_row("config", "loaded", str(config or DEFAULT_CONFIG_PATH))
     console.print(table)
 
     sample = shaper.shape("مرحبا")
     console.print(f"shaping check: logical={sample.logical!r} reshaped={sample.was_reshaped}")
+
+    # How many faces can actually draw the script, which is not the same as how many are
+    # on disk. Without Raqm the renderer draws Arabic presentation forms, and a face that
+    # joins letters through GSUB alone carries no glyphs for them - so it is present,
+    # readable, and unusable. Reporting only the file count hides that completely.
+    if faces:
+        from .core.fonts import FontPool
+
+        pool = FontPool(spec.fonts.paths, include=spec.fonts.include, exclude=spec.fonts.exclude)
+        usable = len(pool.supporting("مرحبا بالعالم 2024 OCR"))
+        colour = "green" if usable > len(faces) * 0.8 else "yellow"
+        advice = (
+            ""
+            if harfbuzz_available() or raqm_available()
+            else "  -> pip install 'ocrsmith[shaping]' to use the rest"
+        )
+        console.print(
+            f"usable faces: [{colour}]{usable}[/] of {len(faces)} can draw Arabic and Latin{advice}"
+        )
+
+    advice = corpus_advice(spec)
+    if advice:
+        console.print(f"[yellow]{advice}[/]")
     if not faces:
         raise typer.Exit(code=1)
 
@@ -418,6 +506,68 @@ def ablate(
         "[green]Done.[/] Train the same model on each arm and compare on a held-out "
         "*real* benchmark - a synthetic test set would reward the generator's own biases."
     )
+
+
+@app.command()
+def bench(
+    config: Path = _CONFIG_OPTION,
+    set_: list[str] = _SET_OPTION,
+    count: int = typer.Option(0, "--count", "-n", help="Samples per mode (0 = pick a sensible default)."),
+    mode: str = typer.Option(
+        "both", "--mode", "-m", help="Which renderer to time: document, line, or both."
+    ),
+) -> None:
+    """Measure single-core generation throughput.
+
+    One core, in this process, with no writing to disk: the number this reports is what
+    the renderer costs, not what your storage costs. Multiply by cores for a run, and
+    check `output.shard_size` first — a shard is the unit of parallelism, so a run with
+    two shards uses two processes however many workers were configured.
+
+    The first call on a machine also pays for the font coverage cache, so the warm-up
+    below is not decoration: without it the first few samples carry a one-off cost that
+    belongs to the installation rather than to the renderer.
+    """
+    import time
+
+    from .pipeline import build_factory
+
+    modes = ["document", "line"] if mode == "both" else [mode]
+    defaults = {"document": 24, "line": 500}
+
+    table = Table(title="single-core throughput")
+    table.add_column("mode")
+    table.add_column("samples", justify="right")
+    table.add_column("seconds", justify="right")
+    table.add_column("per second", justify="right")
+    table.add_column("ms each", justify="right")
+
+    for name in modes:
+        if name not in defaults:
+            console.print(f"[red]Unknown mode {name!r}. Use document, line or both.[/]")
+            raise typer.Exit(code=2)
+        spec = load_config(config, [*(set_ or []), f'render.mode="{name}"'])
+        factory = build_factory(spec)
+        total = count or defaults[name]
+        warmup = max(2, total // 20)
+        for index in range(warmup):
+            list(factory.create(index))
+
+        produced = 0
+        started = time.perf_counter()
+        for index in range(total):
+            for _sample in factory.create(index):
+                produced += 1
+        elapsed = time.perf_counter() - started
+        table.add_row(
+            name,
+            str(produced),
+            f"{elapsed:.2f}",
+            f"[bold]{produced / elapsed:.1f}[/]",
+            f"{elapsed / max(1, produced) * 1000:.1f}",
+        )
+
+    console.print(table)
 
 
 @app.command("show-config")

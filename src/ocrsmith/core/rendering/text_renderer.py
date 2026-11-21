@@ -211,14 +211,20 @@ class TextBlockRenderer:
         for word_plan in plan.words:
             x = origin_x + word_plan.offset
             visual = metrics.visual(word_plan.text)
-            draw.text(
-                (x, origin_y),
-                visual,
-                font=metrics.font,
-                fill=style.fill,
-                stroke_width=stroke_width,
-                stroke_fill=stroke_fill,
-            )
+            if metrics.engine is not None:
+                # Our own engine: the pen sits on the baseline, and there is no synthetic
+                # stroke. A heavier look comes from picking a heavier face, which a real
+                # family has and a faked outline only approximates.
+                metrics.engine.draw(draw._image, visual, x, origin_y + metrics.ascent, style.fill)
+            else:
+                draw.text(
+                    (x, origin_y),
+                    visual,
+                    font=metrics.font,
+                    fill=style.fill,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill,
+                )
             extent = metrics.extent(word_plan.text)
             box = BBox(
                 x + extent.ink_x0 - stroke_width,

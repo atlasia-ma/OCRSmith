@@ -54,9 +54,23 @@ class FontMetrics:
     def __init__(self, font: FreeTypeFont, shaper: TextShaper | None = None):
         self.font = font
         self.shaper = shaper or resolve_shaper()
-        ascent, descent = font.getmetrics()
-        self.ascent = ascent
-        self.descent = descent
+        # When OCRSmith is doing its own shaping, measurement has to come from the same
+        # engine that will draw: Pillow would measure the unshaped characters, which for
+        # Arabic is a different string from the one that reaches the page.
+        self.engine = None
+        if getattr(self.shaper, "name", "") == "harfbuzz":
+            from .glyphs import glyph_engine
+
+            path = getattr(font, "path", None)
+            if path:
+                self.engine = glyph_engine(path, int(getattr(font, "size", 0) or 0))
+        if self.engine is not None:
+            self.ascent = self.engine.ascent
+            self.descent = self.engine.descent
+        else:
+            ascent, descent = font.getmetrics()
+            self.ascent = ascent
+            self.descent = descent
         self._extent = lru_cache(maxsize=8192)(self._measure)
 
     # -- vertical metrics --------------------------------------------------
@@ -103,6 +117,17 @@ class FontMetrics:
         visual = self.visual(text)
         if not visual:
             return TextExtent(0.0, 0.0, 0.0, 0.0, 0.0)
+        if self.engine is not None:
+            run = self.engine.shape(visual)
+            # The engine measures from the baseline; everything here is measured from
+            # the top of the line box, which is `ascent` above it.
+            return TextExtent(
+                run.advance,
+                run.ink_x0,
+                run.ink_y0 + self.ascent,
+                run.ink_x1,
+                run.ink_y1 + self.ascent,
+            )
         advance = float(self.font.getlength(visual))
         x0, y0, x1, y1 = self.font.getbbox(visual)
         return TextExtent(advance, float(x0), float(y0), float(x1), float(y1))

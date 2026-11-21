@@ -366,3 +366,65 @@ class TestPageRoundTrip:
 
         with pytest.raises(ValueError):
             page_from_dict(data)
+
+
+class TestValidationScale:
+    """The gate has to match the renderer it is gating.
+
+    A check calibrated for a page is not a conservative choice on a strip; it is a
+    different check, and the page `NonEmptyText` silently removes a fifth of a line
+    corpus — specifically the short, context-free crops that the line renderer exists to
+    produce.
+    """
+
+    def test_a_one_word_strip_passes_the_line_gate(self):
+        from ocrsmith.quality import default_validators
+
+        sample = _one_word_sample()
+
+        assert default_validators("line").check(sample).passed
+
+    def test_a_one_word_page_still_fails_the_page_gate(self):
+        from ocrsmith.quality import default_validators
+
+        report = default_validators("page").check(_one_word_sample())
+
+        assert not report.passed
+        assert report.failures[0].validator == "NonEmptyText"
+
+    def test_the_page_gate_remains_the_default(self):
+        from ocrsmith.quality import default_validators
+
+        assert not default_validators().check(_one_word_sample()).passed
+
+    def test_an_unknown_scale_is_refused(self):
+        import pytest
+
+        from ocrsmith.quality import default_validators
+
+        with pytest.raises(ValueError, match="scale"):
+            default_validators("strip")
+
+    def test_the_two_scales_differ_in_exactly_one_check(self):
+        from ocrsmith.quality import default_validators
+
+        page = [type(check).__name__ for check in default_validators("page").validators]
+        line = [type(check).__name__ for check in default_validators("line").validators]
+
+        assert page == line
+
+
+def _one_word_sample():
+    """A legible strip carrying a single word — what a detector emits for a form field."""
+    from PIL import Image, ImageDraw
+
+    from ocrsmith.domain import Sample
+    from ocrsmith.domain.annotations import Line, Page, Region, RegionType, Word
+    from ocrsmith.domain.geometry import BBox
+
+    image = Image.new("RGB", (160, 48), (246, 244, 238))
+    ImageDraw.Draw(image).rectangle((20, 14, 140, 34), fill=(10, 10, 10))
+    box = BBox(20, 14, 140, 34)
+    line = Line("2024", box, (Word("2024", box),))
+    page = Page(160, 48, (Region(RegionType.PARAGRAPH, box, (line,)),))
+    return Sample("strip", image, page)

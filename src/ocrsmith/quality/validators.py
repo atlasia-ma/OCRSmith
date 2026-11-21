@@ -265,11 +265,28 @@ class ValidationPipeline:
                 on_reject(report)
 
 
-def default_validators() -> ValidationPipeline:
-    """The checks worth running on every corpus."""
+def default_validators(scale: str = "page") -> ValidationPipeline:
+    """The checks worth running on every corpus, at the given physical scale.
+
+    `scale` is "page" for a document or "line" for a recognition strip. Only one check
+    differs, and it is the one that would otherwise be quietly destructive.
+
+    `NonEmptyText`'s defaults say a sample needs eight characters and two words. On a page
+    that is right: fewer means the render failed, because no real document consists of one
+    word. On a strip it is wrong, and expensively so. A recogniser is fed whatever a
+    detector cut out, and a one-word crop is not a degenerate case there — it is the
+    normal shape of a form field, a table cell, a stamp or a caption. Running the page
+    gate over strips rejected 22% of them, and not at random: it removed precisely the
+    short, context-free strings that the line renderer exists to produce and that a model
+    has no language prior to fall back on. The corpus would have looked clean and been
+    biased towards prose.
+    """
+    if scale not in ("page", "line"):
+        raise ValueError(f"Unknown validation scale {scale!r}. Available: line, page")
+    text_check = NonEmptyText() if scale == "page" else NonEmptyText(min_characters=1, min_words=1)
     return ValidationPipeline(
         [
-            NonEmptyText(),
+            text_check,
             BoxesInsidePage(),
             MinInkCoverage(),
             MinContrast(),
