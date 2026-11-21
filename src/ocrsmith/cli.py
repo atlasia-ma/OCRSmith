@@ -59,6 +59,7 @@ def generate(
             overrides.append(f"{key}={json.dumps(value)}")
 
     spec = load_config(config, overrides)
+    _require_fonts(spec)
     shards = plan_shards(spec)
     console.print(
         f"[bold]{spec.run.num_samples}[/] documents → [bold]{len(shards)}[/] shard(s) "
@@ -100,6 +101,25 @@ def generate(
         for index, reason in result.shard_errors:
             console.print(f"  [red]shard {index}:[/] {reason}")
         raise typer.Exit(code=1)
+
+
+def _require_fonts(spec) -> None:
+    """Stop before the run when there are no fonts, and say what to do about it.
+
+    The repository ships no typefaces, so this is the first thing a new install hits.
+    Without the check it surfaced as a `RuntimeError` traceback from inside a dead
+    worker shard — technically accurate, and a poor way to learn that you need to run
+    one more command.
+    """
+    from .core.fonts import discover_fonts
+
+    if discover_fonts(spec.fonts.paths, include=spec.fonts.include, exclude=spec.fonts.exclude):
+        return
+    console.print(f"[red]No font files found under[/] {list(spec.fonts.paths)}")
+    console.print("OCRSmith ships no typefaces of its own, so fetch some first:")
+    console.print("  [cyan]ocrsmith fetch-fonts --subset arabic --output assets/fonts[/]")
+    console.print("  [cyan]ocrsmith fetch-fonts --subset arabic --hands --output assets/fonts_hands[/]")
+    raise typer.Exit(code=1)
 
 
 @app.command()

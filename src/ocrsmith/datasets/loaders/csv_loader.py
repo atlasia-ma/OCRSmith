@@ -1,6 +1,11 @@
-# src/ocrsmith/datasets/loaders/CSVTextLoader.py
+"""Reading a corpus out of a CSV file.
 
-import pandas as pd
+`pandas` is imported inside the functions that need it, not at module scope. It is an
+optional dependency — `ocrsmith[data]` — and a top-level import made `import ocrsmith`
+itself fail on a base install, because the package imports the pipeline, which imports
+the writers, which imported every loader. A plain `pip install ocrsmith` produced a
+package whose own `--help` crashed.
+"""
 
 from .base import BaseTextDataLoader
 
@@ -12,6 +17,8 @@ class CSVTextLoader(BaseTextDataLoader):
     def load_texts(self, csv_path, **kwargs):
         encoding = kwargs.get("encoding")
         try:
+            import pandas as pd
+
             df = pd.read_csv(csv_path, encoding=encoding)
         except FileNotFoundError:
             raise FileNotFoundError(f"CSV file not found: {csv_path}") from None
@@ -39,6 +46,8 @@ class CSVTextLoader(BaseTextDataLoader):
     def iter_texts(self, csv_path, chunksize=10000, **kwargs):
         """Stream texts from a large CSV in chunks."""
         encoding = kwargs.get("encoding")
+        import pandas as pd
+
         for chunk in pd.read_csv(csv_path, chunksize=chunksize, encoding=encoding):
             if self.text_column not in chunk.columns:
                 raise ValueError(f"Column '{self.text_column}' not found in CSV chunk.")
